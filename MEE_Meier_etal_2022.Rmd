@@ -1,0 +1,32 @@
+---
+title: 'MEE Worked Example: Meier et al. 2022'
+author: "Courtney L. Meier"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+#   Load required libraries
+library(dplyr)
+library(ggplot2)
+library(neonUtilities)
+library(plotly)
+library(stringr)
+library(tidyr)
+
+```
+
+
+### Introduction
+
+The NEON Terrestrial Observation System (TOS) data products are frequently spatially integrated at multiple scales, from the site level to the level of relatively small 'sampling cells' that occur within plots (see Supporting Information, Table 3). The purpose of this worked example is to illustrate this spatial integration, and to show how a data user can work with two TOS data products at different spatial scales in order to draw scientific insight. We focus on the 'Coarse downed wood log survey' data product (DP1.10010.001) and the 'Small mammal box trapping' data product (DP1.10072.001), and we show how to link data at both the plot and site spatial scales.
+
+
+### Load data from the NEON Data Portal
+
+``` {r loadData, results=FALSE}
+#   Test
+
+```

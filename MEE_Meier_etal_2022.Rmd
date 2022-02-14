@@ -21,12 +21,14 @@ library(tidyr)
 
 ### Introduction
 
-The NEON Terrestrial Observation System (TOS) data products are frequently spatially integrated at multiple scales, from the site level to the level of relatively small 'sampling cells' that occur within plots (see Supporting Information, Table 3). The purpose of this worked example is to illustrate this spatial integration, and to show how a data user can work with two TOS data products at different spatial scales in order to draw scientific insight. We focus on the 'Coarse downed wood log survey' data product (DP1.10010.001) and the 'Small mammal box trapping' data product (DP1.10072.001), and we show how to link data at both the plot and site spatial scales.
+The NEON Terrestrial Observation System (TOS) data products are frequently spatially integrated at multiple scales, from the site level to the level of relatively small 'sampling cells' that occur within plots (see Supporting Information, Table 3). The purpose of this worked example is to illustrate this spatial integration, and to show how a data user can work with two TOS data products at different spatial scales in order to draw scientific insight. We focus on the 'Coarse downed wood log survey' data product (DP1.10010.001) and the 'Small mammal box trapping' data product (DP1.10072.001), and we show how to link data at both the plot and site spatial scales. 
 
 
 ### Load data from the NEON Data Portal
 
+At sites with sufficient logs >= 2 cm diameter, the 'Coarse downed wood log survey' data product, hereafter referred to as 'CDW Tally', is generated from both Distributed and Tower plots on a 5 year interval. However, sampling of Distributed and Tower plots is staggered through time such that each plot type is sampled every 2-3 years within a site. Distributed plots are allocated across each site in proportion to the area of dominant NLCD Vegetation Classes, and these plots allow creating statistically robust site-level estimates of both CDW volume (derived from tallies), and small mammal density. The Small Mammal (MAM) data product is generated annually from the majority of TOS sites, and MAM data are collected from grids that are collocated with Distributed base plots that also support CDW sampling. Because MAM grids are not collocated with Tower plots, the first tasks for this example are to identify which NEON sites have produced CDW Tally data, determine the most recent year in which Distributed plots were sampled, and then identify which Distributed plotIDs are collocated with MAM sampling. 
+
 ``` {r loadData, results=FALSE}
-#   Test
+### 
 
 ```

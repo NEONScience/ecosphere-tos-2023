@@ -8,7 +8,8 @@ output: html_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 
-#   Load required libraries
+#   Load required CRAN libraries
+library(devtools)
 library(dplyr)
 library(DT)
 library(ggplot2)
@@ -16,6 +17,10 @@ library(neonUtilities)
 library(plotly)
 library(stringr)
 library(tidyr)
+
+##  Install and load geoNEON package from Github; required to programmatically access TOS Spatial Data
+# devtools::install_github('NEONScience/NEON-geolocation/geoNEON', dependencies=TRUE)
+library(geoNEON)
 
 ```
 
@@ -31,21 +36,21 @@ At sites with sufficient logs >= 2 cm diameter, the 'Coarse downed wood log surv
 
 ``` {r cdwLoadData, results=FALSE}
 ### Load CDW Tally data for last 6 years from NEON Data Portal for all sites and dates; use of a user-specific API token is not required, but can give faster download speeds from the NEON Portal
-cdwDP <- neonUtilities::loadByProduct(
-  dpID = "DP1.10010.001",
-  site = "all",
-  startdate = "2016-01",
-  enddate = "2021-12",
-  package = "basic",
-  release = "RELEASE-2022",
-  tabl = "all",
-  check.size = FALSE,
-  token = Sys.getenv('NEON_PAT')
-)
-
-#   Extract the field tally data from the download list, and save for quicker read-in during dev --> remove saving later
-cdw <- cdwDP$cdw_fieldtally
-saveRDS(cdw, file = "cdw_fieldTally_2016-2021.RDS")
+# cdwDP <- neonUtilities::loadByProduct(
+#   dpID = "DP1.10010.001",
+#   site = "all",
+#   startdate = "2016-01",
+#   enddate = "2021-12",
+#   package = "basic",
+#   release = "RELEASE-2022",
+#   tabl = "all",
+#   check.size = FALSE,
+#   token = Sys.getenv('NEON_PAT')
+# )
+# 
+# #   Extract the field tally data from the download list, and save for quicker read-in during dev --> remove saving later
+# cdw <- cdwDP$cdw_fieldtally
+# saveRDS(cdw, file = "cdw_fieldTally_2016-2021.RDS")
 
 #   Read in saved data for continued dev work
 cdw <- readRDS(file = "cdw_fieldTally_2016-2021.RDS")
@@ -59,9 +64,9 @@ summaryDist <- cdw %>%
   )
 
 #   Selected sites are all predominantly forested
-theSites <- c("HARV","STEI","UKFS","TALL","RMNP","ABBY")
+theSites <- c("HARV","JERC","STEI","UKFS","RMNP","ABBY")
 
-#   Filter CDW data to selected sites and filter to most recent eventID
+#   Filter CDW data to selected sites, filter to most recent eventID, remove unneeded columns
 tempCDW <- cdw %>%
   dplyr::filter(
     plotType=="distributed",
@@ -72,11 +77,21 @@ tempCDW <- cdw %>%
     yearBoutBegan==max(yearBoutBegan)
   ) %>%
   dplyr::arrange(domainID, siteID, plotID) %>%
-  dplyr::ungroup()
+  dplyr::ungroup() %>%
+  dplyr::select(-uid, -coordinateUncertainty, -elevationUncertainty, -publicationDate)
 
 
 ##  Join CDW data with TOS Spatial Data to enable identification of Distributed base plots collocated with MAM grids
-#   TOS Spatial Data URL (manual download): https://data.neonscience.org/documents (then click on 'Spatial Data' and click on 'All_NEON_TOS_Plots_VX' link to retrieve zip that contains a .csv with plot data)
+#   Retrieve TOS Named Location spatial data (i.e., TOS plot spatial data)
+tosPlots <- geoNEON::getLocByName(
+  data = tempCDW,
+  locCol = "namedLocation",
+  locOnly = TRUE
+)
+#--> currently returns API error for unknown reason
+
+
+#   TOS Spatial Data may also be manually downloaed: https://data.neonscience.org/documents (then click on 'Spatial Data' and click on 'All_NEON_TOS_Plots_VX' link to retrieve zip that contains a .csv with plot data)
 tosPlots <- read.csv(file = "All_NEON_TOS_Plot_Centroids_V8.csv", header = TRUE)
 
 #   Create a column 'subtype' that identifies plotIDs collocated with MAM grids
@@ -89,6 +104,19 @@ tempCDW <- tempCDW %>%
   )
 
 ```
+
+
+Need a section here for loading MAM data
+
+``` {r mamLoadData, results=FALSE}
+
+
+```
+
+
+
+### Data QC Checks
+
 
 
 

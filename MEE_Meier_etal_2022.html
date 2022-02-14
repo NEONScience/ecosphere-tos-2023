@@ -11,7 +11,7 @@
 
 <meta name="author" content="Courtney L. Meier" />
 
-<meta name="date" content="2022-02-11" />
+<meta name="date" content="2022-02-14" />
 
 <title>MEE Worked Example: Meier et al. 2022</title>
 
@@ -167,7 +167,7 @@ pre code {
 
 <h1 class="title toc-ignore">MEE Worked Example: Meier et al. 2022</h1>
 <h4 class="author">Courtney L. Meier</h4>
-<h4 class="date">2022-02-11</h4>
+<h4 class="date">2022-02-14</h4>
 
 </div>
 
@@ -178,7 +178,65 @@ pre code {
 </div>
 <div id="load-data-from-the-neon-data-portal" class="section level3">
 <h3>Load data from the NEON Data Portal</h3>
-<pre class="r"><code>#   Test</code></pre>
+<p>At sites with sufficient logs &gt;= 2 cm diameter, the ‘Coarse downed wood log survey’ data product, hereafter referred to as ‘CDW Tally’, is generated from both Distributed and Tower plots on a 5 year interval. However, sampling of Distributed and Tower plots is staggered through time such that each plot type is sampled every 2-3 years within a site. Distributed plots are allocated across each site in proportion to the area of dominant NLCD Vegetation Classes, and these plots allow creating statistically robust site-level estimates of both CDW volume (derived from tallies), and small mammal density. The Small Mammal (MAM) data product is generated annually from the majority of TOS sites, and MAM data are collected from grids that are collocated with Distributed base plots that also support CDW sampling. Because MAM grids are not collocated with Tower plots, the first tasks for this example are to identify which NEON sites have produced CDW Tally data, identify several forested sites with recent Distributed plot data for the example, and then identify which Distributed plotIDs are collocated with MAM sampling.</p>
+<pre class="r"><code>### Load CDW Tally data for last 6 years from NEON Data Portal for all sites and dates; use of a user-specific API token is not required, but can give faster download speeds from the NEON Portal
+# cdwDP &lt;- neonUtilities::loadByProduct(
+#   dpID = &quot;DP1.10010.001&quot;,
+#   site = &quot;all&quot;,
+#   startdate = &quot;2016-01&quot;,
+#   enddate = &quot;2021-12&quot;,
+#   package = &quot;basic&quot;,
+#   release = &quot;RELEASE-2022&quot;,
+#   tabl = &quot;all&quot;,
+#   check.size = FALSE,
+#   token = Sys.getenv(&#39;NEON_PAT&#39;)
+# )
+# 
+# #   Extract the field tally data from the download list, and save for quicker read-in during dev --&gt; remove saving later
+# cdw &lt;- cdwDP$cdw_fieldtally
+# saveRDS(cdw, file = &quot;cdw_fieldTally_2016-2021.RDS&quot;)
+
+#   Read in saved data for continued dev work
+cdw &lt;- readRDS(file = &quot;cdw_fieldTally_2016-2021.RDS&quot;)
+
+#   Summarise data to identify 5-6 sites with recent CDW Tally data from Distributed plots that can be paired with MAM data; for demonstration purposes, goal is to choose a small number of forested sites that span a range of habitats
+summaryDist &lt;- cdw %&gt;%
+  dplyr::filter(plotType==&quot;distributed&quot;) %&gt;%
+  dplyr::group_by(domainID, siteID, eventID, samplingImpractical) %&gt;%
+  dplyr::summarise(
+    plotCount = length(unique(plotID))
+  )</code></pre>
+<pre><code>## `summarise()` has grouped output by &#39;domainID&#39;, &#39;siteID&#39;, &#39;eventID&#39;. You can
+## override using the `.groups` argument.</code></pre>
+<pre class="r"><code>#   Selected sites are all predominantly forested
+theSites &lt;- c(&quot;HARV&quot;,&quot;STEI&quot;,&quot;UKFS&quot;,&quot;TALL&quot;,&quot;RMNP&quot;,&quot;ABBY&quot;)
+
+#   Filter CDW data to selected sites and filter to most recent eventID
+tempCDW &lt;- cdw %&gt;%
+  dplyr::filter(
+    plotType==&quot;distributed&quot;,
+    siteID %in% theSites
+  ) %&gt;%
+  dplyr::group_by(domainID, siteID) %&gt;%
+  dplyr::filter(
+    yearBoutBegan==max(yearBoutBegan)
+  ) %&gt;%
+  dplyr::arrange(domainID, siteID, plotID) %&gt;%
+  dplyr::ungroup()
+
+
+##  Join CDW data with TOS Spatial Data to enable identification of Distributed base plots collocated with MAM grids
+#   TOS Spatial Data URL (manual download): https://data.neonscience.org/documents (then click on &#39;Spatial Data&#39; and click on &#39;All_NEON_TOS_Plots_VX&#39; link to retrieve zip that contains a .csv with plot data)
+tosPlots &lt;- read.csv(file = &quot;All_NEON_TOS_Plot_Centroids_V8.csv&quot;, header = TRUE)
+
+#   Create a column &#39;subtype&#39; that identifies plotIDs collocated with MAM grids
+tempCDW &lt;- tempCDW %&gt;%
+  dplyr::left_join(
+    tosPlots %&gt;% 
+      filter(subtype==&quot;mammalGrid&quot;) %&gt;% 
+      select(plotID, subtype),
+    by = &quot;plotID&quot;
+  )</code></pre>
 </div>
 
 

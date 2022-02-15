@@ -20,7 +20,7 @@ library(tidyr)
 
 ##  Install and load geoNEON package from Github; required to programmatically access TOS Spatial Data
 # devtools::install_github('NEONScience/NEON-geolocation/geoNEON', dependencies=TRUE)
-# library(geoNEON)
+library(geoNEON)
 
 ```
 
@@ -34,7 +34,7 @@ The NEON Terrestrial Observation System (TOS) data products are frequently spati
 
 At sites with sufficient logs >= 2 cm diameter, the 'Coarse downed wood log survey' data product, hereafter referred to as 'CDW Tally', is generated from both Distributed and Tower plots on a 5 year interval. However, sampling of Distributed and Tower plots is staggered through time such that each plot type is sampled every 2-3 years within a site. Distributed plots are allocated across each site in proportion to the area of dominant NLCD Vegetation Classes, and these plots allow creating statistically robust site-level estimates of both CDW volume (derived from tallies), and small mammal density. The Small Mammal (MAM) data product is generated annually from the majority of TOS sites, and MAM data are collected from grids that are collocated with Distributed base plots that also support CDW sampling. Because MAM grids are not collocated with Tower plots, the first tasks for this example are to identify which NEON sites have produced CDW Tally data, identify several forested sites with recent Distributed plot data for the example, and then identify which Distributed plotIDs are collocated with MAM sampling. 
 
-``` {r cdwLoadData, results=FALSE}
+``` {r cdwLoadData, results=FALSE, message=FALSE}
 ### Load CDW Tally data for last 6 years from NEON Data Portal for all sites and dates; use of a user-specific API token is not required, but can give faster download speeds from the NEON Portal
 # cdwDP <- neonUtilities::loadByProduct(
 #   dpID = "DP1.10010.001",
@@ -81,33 +81,46 @@ tempCDW <- cdw %>%
   dplyr::select(-uid, -coordinateUncertainty, -elevationUncertainty, -publicationDate)
 
 
-##  Join CDW data with TOS Spatial Data to enable identification of Distributed base plots collocated with MAM grids
-#   Retrieve TOS Named Location spatial data (i.e., TOS plot spatial data)
-tosPlots <- geoNEON::getLocByName(
+
+### Identify plotIDs in CDW dataset that are collocated with MAM sampling grids
+#   First, create MAM 'namedLocation' value for each CDW namedLocation value (e.g., 'HARV_001.mammalGrid.mam'); the goal is to
+#   check whether each CDW namedLocation has a collocated MAM namedLocation. The structure of the namedLocation value for any
+#   NEON data product can be determined by downloading data and checking the namedLocation field.
+tempCDW <- tempCDW %>%
+  dplyr::mutate(
+    mamNamedLoc = stringr::str_replace(
+      string = namedLocation,
+      pattern = "basePlot.cdw",
+      replacement = "mammalGrid.mam"
+    ),
+    .after = namedLocation
+  ) %>%
+  as.data.frame()
+
+#   Second, retrieve namedLocation data for each mamNamedLoc value that was constructed above; if a CDW
+#   namedLocation is also a MAM namedLocation, the geoNEON::getLocByName() function will return a value from the API; if a CDW
+#   namedLocation is not also a MAM namedLocation, the function does not return a value.
+#   Note: The 'data' argument must be a data.frame() and CANNOT be a tibble (the latter is commonly returned by dplyr).
+mamPlots <- geoNEON::getLocByName(
   data = tempCDW,
-  locCol = "namedLocation",
+  locCol = "mamNamedLoc",
   locOnly = TRUE,
   token = Sys.getenv('NEON_PAT')
 )
-#--> currently returns API error for unknown reason
-test <- getAPI(paste("http://data.neonscience.org/api/v0/locations/", tempCDW$namedLocation[1], sep=''), 
-                    token=Sys.getenv('NEON_PAT'))
 
-
-
-
-
-#   TOS Spatial Data may also be manually downloaed: https://data.neonscience.org/documents (then click on 'Spatial Data' and click on 'All_NEON_TOS_Plots_VX' link to retrieve zip that contains a .csv with plot data)
-tosPlots <- read.csv(file = "All_NEON_TOS_Plot_Centroids_V8.csv", header = TRUE)
-
-#   Create a column 'subtype' that identifies plotIDs collocated with MAM grids
+#   Third, join tempCDW data with mamPlots and create a 'subtype' column to identify collocated sampling
 tempCDW <- tempCDW %>%
   dplyr::left_join(
-    tosPlots %>% 
-      filter(subtype=="mammalGrid") %>% 
+    mamPlots %>% 
       select(plotID, subtype),
     by = "plotID"
-  )
+  ) %>%
+  dplyr::select(-mamNamedLoc)
+
+#   Rather than programmatically retrieving TOS Spatial Data via the API, these data may also be manually downloaded: https://data.neonscience.org/documents (then click on 'Spatial Data' and click on 'All_NEON_TOS_Plots_VX' link to retrieve zip that contains a .csv with plot data)
+# tosPlots <- read.csv(file = "All_NEON_TOS_Plot_Centroids_V8.csv", header = TRUE)
+
+
 
 ```
 
@@ -123,7 +136,17 @@ Need a section here for loading MAM data
 
 ### Data QC Checks
 
+For CDW tally data, prior to analysis it is important to:
+- Check for duplicates, and
+- Verify that all tallied logs meet LIDS tally criteria based on reported `logDiameter`, `logDistance`, and `volumeFactor` data.
 
+``` {r cdwDataQC}
+#--> need to construct an individualID for 'L' logs
+#--> create a maximum transect length LUT from protocol appendix, use to verify no typos for logDistance
+#--> Verify that volumeFactor is reported for all records
+#--> Create jitterplot of logDiameter values by site to look for fat fingering
+
+```
 
 
 

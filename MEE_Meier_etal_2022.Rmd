@@ -9,7 +9,7 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 
 #   Load required CRAN libraries
-library(devtools)
+# library(devtools)
 library(dplyr)
 library(DT)
 library(ggplot2)
@@ -20,7 +20,7 @@ library(tidyr)
 
 ##  Install and load geoNEON package from Github; required to programmatically access TOS Spatial Data
 # devtools::install_github('NEONScience/NEON-geolocation/geoNEON', dependencies=TRUE)
-library(geoNEON)
+# library(geoNEON)
 
 ```
 
@@ -90,7 +90,7 @@ tosPlots <- geoNEON::getLocByName(
   token = Sys.getenv('NEON_PAT')
 )
 #--> currently returns API error for unknown reason
-test <- getAPI(paste("http://data.neonscience.org/api/v0/locations/", tempCDW$namedLocation[900], sep=''), 
+test <- getAPI(paste("http://data.neonscience.org/api/v0/locations/", tempCDW$namedLocation[1], sep=''), 
                     token=Sys.getenv('NEON_PAT'))
 
 

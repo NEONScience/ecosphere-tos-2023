@@ -86,9 +86,15 @@ tempCDW <- cdw %>%
 tosPlots <- geoNEON::getLocByName(
   data = tempCDW,
   locCol = "namedLocation",
-  locOnly = TRUE
+  locOnly = TRUE,
+  token = Sys.getenv('NEON_PAT')
 )
 #--> currently returns API error for unknown reason
+test <- getAPI(paste("http://data.neonscience.org/api/v0/locations/", tempCDW$namedLocation[900], sep=''), 
+                    token=Sys.getenv('NEON_PAT'))
+
+
+
 
 
 #   TOS Spatial Data may also be manually downloaed: https://data.neonscience.org/documents (then click on 'Spatial Data' and click on 'All_NEON_TOS_Plots_VX' link to retrieve zip that contains a .csv with plot data)

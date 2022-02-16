@@ -98,8 +98,8 @@ tempCDW <- tempCDW %>%
   as.data.frame()
 
 #   Second, retrieve namedLocation data for each mamNamedLoc value that was constructed above; if a CDW
-#   namedLocation is also a MAM namedLocation, the geoNEON::getLocByName() function will return a value from the API; if a CDW
-#   namedLocation is not also a MAM namedLocation, the function does not return a value.
+#   namedLocation is also a MAM namedLocation, the geoNEON::getLocByName() function will return a value from the NEON API;
+#   if a CDW namedLocation is not also a MAM namedLocation, the function does not return a value.
 #   Note: The 'data' argument must be a data.frame() and CANNOT be a tibble (the latter is commonly returned by dplyr).
 mamPlots <- geoNEON::getLocByName(
   data = tempCDW,
@@ -141,9 +141,61 @@ For CDW tally data, prior to analysis it is important to:
 - Verify that all tallied logs meet LIDS tally criteria based on reported `logDiameter`, `logDistance`, and `volumeFactor` data.
 
 ``` {r cdwDataQC}
-#--> need to construct an individualID for 'L' logs
+### Check for individualID duplicates; duplicate checks are important because log counts are used to estimate CDW volume
+#   First, construct an individualID for logs < 10 cm diameter that are not tagged; smaller logs are not tagged and are given a unique temporary logID beginning with 'L' since they are less likely to persist over the 5-year CDW Tally measurement interval; second, construct a primary key from plotID, date, lidsAzimuth, and individualID
+tempCDW <- tempCDW %>%
+  dplyr::mutate(
+    individualID = case_when(
+      is.na(individualID) & targetTaxaPresent=="Y" ~ paste("NEON.CDW", domainID, plotID, logID, sep = "."),
+      TRUE ~ individualID
+    ),
+    key = paste(plotID, date, lidsAzimuth, individualID, sep = "_")
+  )
+
+#   Identify duplicates based on 'key' value
+cdwDupesKey <- tempCDW %>%
+  dplyr::filter(duplicated(tempCDW$key)) %>%
+  dplyr::select(key)
+
+cdwDupes <- tempCDW %>%
+  dplyr::filter(key %in% cdwDupesKey$key)
+
+#--> Log data assessment for dupes: only first one listed appears to be really a duplicate based on examination of other data fields; ABBY records are 'dupes' because transect was reflected, so not real duplicates.
+
+#   Remove second instance of cdwDupes$key=="STEI_002_2016-05-26_320_NEON.CDW.D05.00375"
+cdwRemoveDupe <- cdwDupes %>%
+  dplyr::distinct(key)
+
+tempCDW <- tempCDW %>%
+  dplyr::filter(!key %in% cdwRemoveDupe$key[1]) %>%
+  dplyr::bind_rows(cdwDupes[1,]) %>%
+  dplyr::arrange(domainID, siteID, plotID, lidsAzimuth, individualID)
+
+
+
+### Verify that volumeFactor is reported for all records
+vfCheck <- tempCDW %>%
+  dplyr::group_by(domainID, siteID, volumeFactor) %>%
+  dplyr::summarise(
+    count = n()
+  )
+#--> volumeFactor data entry problems for HARV and STEI; volumeFactor is assigned at the site level and should not vary from plot-to-plot. Assign volumeFactor to all records within a site based on most frequently used value and cross-checked with value published in NEON.DOC.001711, Appendix D, Table 19
+
+#   Correct volumeFactor data for HARV, STEI sites
+tempCDW <- tempCDW %>%
+  dplyr::mutate(volumeFactor = as.numeric(volumeFactor)) %>%
+  dplyr::mutate(
+    volumeFactor = case_when(
+      siteID=="HARV" & (volumeFactor!=5 | is.na(volumeFactor)) ~ 5,
+      siteID=="STEI" & (volumeFactor!=5 | is.na(volumeFactor)) ~ 5,
+      TRUE ~ volumeFactor
+    )
+  )
+
+
+
+
 #--> create a maximum transect length LUT from protocol appendix, use to verify no typos for logDistance
-#--> Verify that volumeFactor is reported for all records
 #--> Create jitterplot of logDiameter values by site to look for fat fingering
 
 ```

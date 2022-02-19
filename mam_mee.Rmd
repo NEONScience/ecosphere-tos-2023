@@ -98,11 +98,6 @@ mam_trapNight_nodups <- neonOS::removeDups(data=mam_trapNight_remainingRecords,
                              variables=variables_10072,
                              table='mam_pertrapnight') 
 # Output from this function:
-# Primary key fields contain NA values and/or empty strings. Results may be unreliable; check input data carefully.
-# 235 duplicated key values found, representing 493 non-unique records. Attempting to resolve.
-#   |=======================================================================================================| 100%
-# 240 resolvable duplicates merged into matching records
-# 217 resolved records flagged with duplicateRecordQF=1
 # 36 unresolvable duplicates flagged with duplicateRecordQF=2
 
 #follow-up trouble-shooting
@@ -186,13 +181,46 @@ write.csv(capsNew, 'mam_final_dataset.csv', row.names = F)
 caps_notags <- captures %>% filter(is.na(tagID))
 capsNew <- bind_rows(capsNew, caps_notags)
 
+#add event ID to enable summarizing by trapping bouts (includes up to 3 nights of trapping for some plots in each bout, 1 night for other plots)
+bouts <- mam_plotNight_nodups %>% select(eventID, nightuid)
+capsNew <- left_join(capsNew, bouts)
+
 ```
 
 # Generate abundance estimates for analysis
 
 ```{r, functions for analysis, echo = FALSE, results = 'asis', message = FALSE}
 
+capture_data <- capsNew
+all_mam_plots <- unique(mam_plotNight_nodups$plotID)
+all_mam_sites <- unique(mam_plotNight_nodups$siteID)
 
+#1. function to calculate mnka in each trapping bout on each plot, allowing a vector of plotIDs of interest (plotsOI) to be provided, defaulting to all NEON mammal plots 
+mnka_per_plot_per_bout <- function(capture_data, plotsOI = all_mam_plots) {
+  caps <- capture_data %>% filter(plotID %in% plotsOI)
+  ids_by_plot_bout <- capture_data %>% group_by(eventID,plotID) %>% distinct(tagID)
+  mnka_by_plot_bout <- ids_by_plot_bout %>% group_by(eventID,plotID) %>% count()
+  return(mnka_by_plot_bout)
+}
 
+#2. function to calculate the mean mnka in each trapping bout across all plots at a site, allowing a vector of plotIDs of interest (plotsOI) to be provided, defaulting to all NEON mammal plots, and a vector of sites of interest, defaulting to all NEON sites. timeframe can be set to either "bout" (default) or "year" to determine how many samples are used to define the mean
+mnka_per_site <- function(capture_data, plotsOI = all_mam_plots, sitesOI = all_mam_sites, timeframe = "bout") {
+  caps <- capture_data %>% mutate(siteID = substr(plotID, 1, 4)) %>% 
+                                     filter(plotID %in% plotsOI & siteID %in% sitesOI)
+  mnka_by_plot_bout <- mnka_per_plot_per_bout(caps)
+  if (timeframe == "bout"){
+    mean_mnka_by_site_bout <- mnka_by_plot_bout %>% mutate(siteID = substr(plotID, 1, 4)) %>%
+      group_by(siteID, eventID) %>% 
+      summarise(meanMNKA = mean(n))
+      return(mean_mnka_by_site_bout)
+    }
+    else if (timeframe == "year"){
+      mean_mnka_by_site_year <- mnka_by_plot_bout %>% 
+        mutate(siteID = substr(plotID, 1, 4), year = substr(eventID, 6, 9)) %>%
+        group_by(year, siteID) %>% 
+        summarise(meanMNKA = mean(n))
+      return(mean_mnka_by_site_year)
+    }
+}
 
 ```

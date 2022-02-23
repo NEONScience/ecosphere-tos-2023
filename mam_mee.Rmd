@@ -1,0 +1,226 @@
+---
+title: "MAM MEE example"
+author: "Kate Thibault"
+date: "`r format(Sys.time(), '%B %Y')`"
+output: 
+  html_document:
+    toc: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(eval = T, echo = F, message = F)
+```
+
+## Load packages and data
+
+```{r R version, message= FALSE}
+#version$version.string
+```
+
+```{r load packages, results = F}
+
+# Load CRAN packages
+library(neonUtilities) # functions to download portal data
+library(tidyverse) #functions to summarise data
+library(devtools) #functions for interacting with packages not yet on CRAN
+library(httr) #functions for interacting with NEON API
+library(jsonlite) #functions for interacting with NEON API
+
+# Install packages from GitHub 
+# install_github('NEONScience/NEON-OS-data-processing/neonOS')
+library(neonOS) #functions for basic quality checks, such as duplicate checks
+
+#set working directory
+pathToWd <- "/Users/kthibault/Box/Mammals/MEE_ms/"
+setwd(pathToWd)
+
+```
+```{r load data, results = F}
+
+# Load small mammal box trapping data via NEON API - note this is all of the data included in the latest release so can take some time to download
+dat <- loadByProduct(
+  dpID = 'DP1.10072.001',
+  check.size = F, 
+  site = "all",
+  package = 'basic',
+  release = 'RELEASE-2022',
+  token = Sys.getenv('NEON_API') # API token from the My Account page for the registered user at data.neonscience.org - highly recommended as it will speed up your downloads and help NEON measure data use.
+  ) 
+
+mamDataCitation <- paste0("NEON (National Ecological Observatory Network). Small mammal box trapping, RELEASE-2022 (DP1.10072.001). https://doi.org/10.48443/h3dk-3a71. Dataset accessed from https://data.neonscience.org on ", Sys.Date())
+
+# Turn all tables in the list to dataframe (DF) in the global environment, where name of table = name of DF. 
+list2env(dat, envir=.GlobalEnv)
+
+#read in master SMALL_MAMMAL taxon table via the NEON API
+#https://www.neonscience.org/resources/learning-hub/tutorials/neon-api-usage
+#using the verbose option to get the taxonProtocolCategory field
+mam.req <- GET("https://data.neonscience.org/api/v0/taxonomy/?taxonTypeCode=SMALL_MAMMAL&verbose=true&offset=0&limit=1000")
+mam.list <- jsonlite::fromJSON(content(mam.req, as="text"))
+
+print("Data downloaded! Please don't forget to cite these data propoerly!")
+
+```
+## Clean and Prepare Data for Analysis
+### Check for Duplicates
+
+Let's check for duplicates in the included data tables:  
+
+* perplotnight - records with the same plot and date combination (as captured in an auto-generated nightuid).  
+* pertrapnight - records with the same nightuid, trap coordinate, and tagID or individualCode - note that standard function cannot account for multiple captures of untagged individuals in a single trap) 
+
+```{r duplicate checks, results = F}
+
+#1. check perplotnight table by nightuid using standard removeDups function
+mam_plotNight_nodups <- neonOS::removeDups(data=mam_perplotnight,
+                             variables=variables_10072,
+                             table='mam_perplotnight')
+
+# running this check generated the message: Primary key fields contain NA values and/or empty strings. Results may be unreliable; check input data carefully. - followed by an error message
+#To troubleshoot, I first queried the table to find the problematic records:
+problems <- which(is.na(mam_perplotnight$nightuid))
+# I then check the pertrapnight table to see if there are corresponding records that might have a nightuid
+temp <- mam_pertrapnight %>% filter(plotID %in% mam_perplotnight$plotID[problems] & collectDate %in% mam_perplotnight$collectDate[problems])
+#Since the remaining fields were populated and there are captures for each, these records appear to represent a valid night of trapping. So, I assigned my own temporary nightuids in both tables and let NEON staff know about the issue (https://www.neonscience.org/about/contact-us).
+mam_perplotnight_adj <- mam_perplotnight %>% mutate(nightuid = paste(plotID, '_', collectDate, sep = ''))
+mam_pertrapnight_adj <- mam_pertrapnight %>% mutate(nightuid = paste(plotID, '_', collectDate, sep = ''))
+#with these fixes in place, I reran the duplicate removal function:
+mam_plotNight_nodups <- neonOS::removeDups(data=mam_perplotnight_adj,
+                             variables=variables_10072,
+                             table='mam_perplotnight')
+#this function found 4 resolvable duplicates that were merged and flagged with duplicateRecordQF=1  
+
+#2. check pertrapnight table by nightuid and trapcoordinate using standard removeDups function - note that RELEASE 2022 contains 1.4M records, so this can take about an hour on a personal laptop
+# In rare cases, multiple animals can be captured in a single trap on the same night and not all receive unique tagIDs or individualCodes. This means that the duplicate function is not effective for these records. So, let's go ahead and subset out those records, before we run the check, and then we can add them back together afterwards.
+mam_trapNight_multipleCaps <- mam_pertrapnight_adj %>% filter(trapStatus == "4 - more than 1 capture in one trap" & is.na(tagID) & is.na(individualCode))
+mam_trapNight_remainingRecords <- mam_pertrapnight_adj %>% filter(!(uid %in% mam_trapNight_multipleCaps$uid))
+mam_trapNight_nodups <- neonOS::removeDups(data=mam_trapNight_remainingRecords,
+                             variables=variables_10072,
+                             table='mam_pertrapnight') 
+# Output from this function:
+# 36 unresolvable duplicates flagged with duplicateRecordQF=2
+
+#follow-up trouble-shooting
+#2.1. check for unexpected NAs in primary keys
+#which(is.na(mam_pertrapnight_adj$nightuid)) yields 0
+#which(is.na(mam_pertrapnight_adj$trapCoordinate)) yields 0
+#which means that trapID and individualCode are the source of the NAs, which is expected based on the protocol
+#2.2. check that the unresolved duplicates will not impact the intended analyses
+dupCheck <- mam_trapNight_nodups %>% filter(duplicateRecordQF == 2 & trapStatus != "4 - more than 1 capture in one trap")
+#since there is only one capture record in the set, these unresolved duplicates will not impact the intended analyses
+
+#3. add multiple capture records back to dataset
+mam_trapNight_nodups <- bind_rows(mam_trapNight_nodups, mam_trapNight_multipleCaps)
+
+```
+
+### Populate eventID field to facilitate grouping of data by trapping bout
+```{r Populate eventIDs} 
+
+#for each site each record within 14 days of each other is assigned the same eventID
+mam_plotNight_nodups <- mam_plotNight_nodups %>% 
+  dplyr::group_by(siteID) %>% 
+  mutate(date = lubridate::ymd(collectDate),group = cut(date, "14 days")) %>%
+  ungroup 
+
+mam_plotNight_nodups$eventID <- paste0(mam_plotNight_nodups$siteID,"_",mam_plotNight_nodups$group) 
+
+#add to mam_trapNight_nodups
+mam_trapNight_nodups <- mam_trapNight_nodups %>% left_join(dplyr::select(mam_plotNight_nodups,nightuid,eventID))
+
+```
+
+
+### Create and finalize capture dataset
+```{r, finalize datsets for analysis, echo = FALSE, results = 'asis', message = FALSE}
+
+#1. subset trapping data to only the capture records, i.e., the records that describe a captured small mammal, including only those taxa for which the trapping protocol is designed
+# this should involve a simple filtering based on trapStatus and taxonProtocolCategory, but let's do some further quality check first
+#1.1. check to make sure all captures have the correct trapStatus - i.e., check if tagIDs exist but trap status does not include "capture"
+problemRecords <- mam_trapNight_nodups %>% 
+  filter(!is.na(tagID)) %>% 
+  filter(!grepl("capture",trapStatus))
+#if nrow(problemRecords) > 0, update the corresponding trapStatus fields to "5 - capture" or, in the rare case where there are multiple captures in one trap, "4 - more than 1 capture in one trap" - this rare case does not occur in the current dataset, so it is not addressed here
+mam_trapNight_nodups$trapStatus <- ifelse(mam_trapNight_nodups$uid %in% problemRecords$uid, "5 - capture", mam_trapNight_nodups$trapStatus)
+
+#2. create list of target taxa from taxon list 
+targetTaxa <- mam.list$data %>% filter(taxonProtocolCategory == "target") %>% select(taxonID)
+
+#3. create list of core fields to reduce the size of the dataset to ease use
+coreFields <- c("uid", "nightuid", "plotID", "collectDate", "tagID")
+
+#4. filter trap dataset to just the capture records of target taxa and the core fields defined above
+captures <- mam_trapNight_nodups %>% 
+  filter(grepl("capture",trapStatus) & taxonID %in% targetTaxa$taxonID) %>% select(all_of(coreFields))
+
+#5. here we are going to use the minimum number known alive (MNKA) approach to indicate total small mammal abundance - e.g., Norman A. Slade, Susan M. Blair, An Empirical Test of Using Counts of Individuals Captured as Indices of Population Size, Journal of Mammalogy, Volume 81, Issue 4, November 2000, Pages 1035–1045, https://doi.org/10.1644/1545-1542(2000)081<1035:AETOUC>2.0.CO;2. This approach assumes that a marked individual is present at all sampling points between its forst and last capture dates, even if it wasn't actually captured in those interim trapping sessions. So, we need to add those implicit records to the dataset to make them explicit. 
+#5.1. Generate a column of all of the unique tagIDs included in the dataset
+uTags <- captures %>% select(tagID) %>% filter(!is.na(tagID)) %>% distinct()
+#create empty data frame to populate
+capsNew <- slice(captures,0)
+#for each tagged individual, add a record for each night of trapping done on the plots on which it was captured between the first and last dates of capture - this is >49k tags, so it takes some time
+for (i in uTags$tagID){
+  temp <- captures %>% filter(tagID == i)
+  firstCap <- as.Date(min(temp$collectDate), "YYYY-MM-DD", tz = "UTC")
+  lastCap <- as.Date(max(temp$collectDate), "YYYY-MM-DD", tz = "UTC")
+  possibleDates <- seq(as.Date(firstCap), as.Date(lastCap), by="days")
+  plots <- unique(temp$plotID)
+  potentialNights <- mam_plotNight_nodups %>% 
+    filter(as.character(collectDate) %in% as.character(possibleDates) & 
+                                                       plotID %in% plots) %>% 
+    select(nightuid,plotID, collectDate) %>% 
+    mutate(tagID=i)
+  temp2 <- left_join(potentialNights, temp)
+  capsNew <- bind_rows(capsNew, temp2)
+}
+ 
+#save a copy for reuse later to avoid all the time-consuming processing 
+write.csv(capsNew, 'mam_final_dataset.csv', row.names = F)
+
+#add untagged individuals back to the dataset
+caps_notags <- captures %>% filter(is.na(tagID))
+capsNew <- bind_rows(capsNew, caps_notags)
+
+#add event ID to enable summarizing by trapping bouts (includes up to 3 nights of trapping for some plots in each bout, 1 night for other plots)
+bouts <- mam_plotNight_nodups %>% select(eventID, nightuid)
+capsNew <- left_join(capsNew, bouts)
+
+```
+
+# Generate abundance estimates for analysis
+
+```{r, functions for analysis, echo = FALSE, results = 'asis', message = FALSE}
+
+capture_data <- capsNew
+all_mam_plots <- unique(mam_plotNight_nodups$plotID)
+all_mam_sites <- unique(mam_plotNight_nodups$siteID)
+
+#1. function to calculate mnka in each trapping bout on each plot, allowing a vector of plotIDs of interest (plotsOI) to be provided, defaulting to all NEON mammal plots 
+mnka_per_plot_per_bout <- function(capture_data, plotsOI = all_mam_plots) {
+  caps <- capture_data %>% filter(plotID %in% plotsOI)
+  ids_by_plot_bout <- capture_data %>% group_by(eventID,plotID) %>% distinct(tagID)
+  mnka_by_plot_bout <- ids_by_plot_bout %>% group_by(eventID,plotID) %>% count()
+  return(mnka_by_plot_bout)
+}
+
+#2. function to calculate the mean mnka in each trapping bout across all plots at a site, allowing a vector of plotIDs of interest (plotsOI) to be provided, defaulting to all NEON mammal plots, and a vector of sites of interest, defaulting to all NEON sites. timeframe can be set to either "bout" (default) or "year" to determine how many samples are used to define the mean
+mnka_per_site <- function(capture_data, plotsOI = all_mam_plots, sitesOI = all_mam_sites, timeframe = "bout") {
+  caps <- capture_data %>% mutate(siteID = substr(plotID, 1, 4)) %>% 
+                                     filter(plotID %in% plotsOI & siteID %in% sitesOI)
+  mnka_by_plot_bout <- mnka_per_plot_per_bout(caps)
+  if (timeframe == "bout"){
+    mean_mnka_by_site_bout <- mnka_by_plot_bout %>% mutate(siteID = substr(plotID, 1, 4)) %>%
+      group_by(siteID, eventID) %>% 
+      summarise(meanMNKA = mean(n))
+      return(mean_mnka_by_site_bout)
+    }
+    else if (timeframe == "year"){
+      mean_mnka_by_site_year <- mnka_by_plot_bout %>% 
+        mutate(siteID = substr(plotID, 1, 4), year = substr(eventID, 6, 9)) %>%
+        group_by(year, siteID) %>% 
+        summarise(meanMNKA = mean(n))
+      return(mean_mnka_by_site_year)
+    }
+}
+
+```

@@ -63,7 +63,7 @@ summaryDist <- cdw %>%
     plotCount = length(unique(plotID))
   )
 
-#   Selected sites are all predominantly forested
+#   Selected sites are all predominantly forested; note that RMNP has different F-values and transect lengths for Distributed and Tower plots due to distant parcels of land used for each plot type and different forest types.
 theSites <- c("HARV","JERC","STEI","UKFS","RMNP","ABBY")
 
 #   Filter CDW data to selected sites, filter to most recent eventID, remove unneeded columns
@@ -138,7 +138,7 @@ Need a section here for loading MAM data
 
 For CDW tally data, prior to analysis it is important to:
 - Check for duplicates, and
-- Verify that all tallied logs meet LIDS tally criteria based on reported `logDiameter`, `logDistance`, and `volumeFactor` data.
+- Verify that all tallied logs meet LIDS tally criteria based on reported `equivalentLogDiameter`, `logDistance`, and `volumeFactor` data. The `equivalentLogDiameter` is used so that round and elliptical logs (typically highly decayed) can be assessed with the same criteria.
 
 ``` {r cdwDataQC}
 ### Check for individualID duplicates; duplicate checks are important because log counts are used to estimate CDW volume
@@ -159,7 +159,6 @@ cdwDupesKey <- tempCDW %>%
 
 cdwDupes <- tempCDW %>%
   dplyr::filter(key %in% cdwDupesKey$key)
-
 #--> Log data assessment for dupes: only first one listed appears to be really a duplicate based on examination of other data fields; ABBY records are 'dupes' because transect was reflected, so not real duplicates.
 
 #   Remove second instance of cdwDupes$key=="STEI_002_2016-05-26_320_NEON.CDW.D05.00375"
@@ -173,15 +172,32 @@ tempCDW <- tempCDW %>%
 
 
 
-### Verify that volumeFactor is reported for all records
-vfCheck <- tempCDW %>%
-  dplyr::group_by(domainID, siteID, volumeFactor) %>%
-  dplyr::summarise(
-    count = n()
-  )
-#--> volumeFactor data entry problems for HARV and STEI; volumeFactor is assigned at the site level and should not vary from plot-to-plot. Assign volumeFactor to all records within a site based on most frequently used value and cross-checked with value published in NEON.DOC.001711, Appendix D, Table 19
+### Perform QC checks for volumeFactor, logDistance, and equivalentLogDiameter
+##  Volume Factor: Check value matches protocol and flag if no match
+#   Read in CDW volumeFactor and transectLength LUT derived from protocol (NEON.DOC.001711)
+cdwParam <- read.csv(file = "cdw_siteParamLookup.csv", header = TRUE)
 
-#   Correct volumeFactor data for HARV, STEI sites
+#   Join LUT values with CDW data and flag records with incorrect f-value
+tempCDW <- tempCDW %>%
+  dplyr::left_join(
+    cdwParam %>% dplyr::select(siteID, fValue, transectLength),
+    by = "siteID"
+  ) %>%
+  dplyr::mutate(
+    fValQF = case_when(
+      is.na(volumeFactor) ~ 1,
+      volumeFactor==fValue ~ 0,
+      TRUE ~ 1
+    )
+  )
+
+#   Check records with volumeFactor problems and evaluate
+fCheck <- tempCDW %>%
+  dplyr::filter(fValQF==1) %>%
+  dplyr::select(domainID, siteID, volumeFactor, fValue, fValQF)
+#--> volumeFactor data entry problems for HARV and STEI; volumeFactor is assigned at the site level and should not vary from plot-to-plot. 
+
+#   Correct volumeFactor data for HARV, STEI sites based on fCheck results
 tempCDW <- tempCDW %>%
   dplyr::mutate(volumeFactor = as.numeric(volumeFactor)) %>%
   dplyr::mutate(
@@ -193,10 +209,45 @@ tempCDW <- tempCDW %>%
   )
 
 
+##  Log Distance: Check for values that exceed maximum transect length from protocol, flag, and remove
+tempCDW <- tempCDW %>%
+  dplyr::mutate(
+    logDistQF = case_when(
+      is.na(logDistance) ~ 0,
+      logDistance > transectLength ~ 1,
+      TRUE ~ 0
+    )
+  ) %>%
+  dplyr::filter(logDistQF==0)
 
 
-#--> create a maximum transect length LUT from protocol appendix, use to verify no typos for logDistance
-#--> Create jitterplot of logDiameter values by site to look for fat fingering
+
+### Tally QC checks: Verify log should be tallied based on reported diameter, logDistance, and volumeFactor
+##  Check whether logDistance is < limitingDistance (it should be) based on equivalentLogDiameter
+#   Define function to calculate limiting distance
+# dlim <- function(RD, transectNum, fValue){
+#   d = round(((pi^2)*(RD^2))/(8*transectNum*fValue), digits=2)
+#   return(d)
+# }
+
+#   Check logDistance, flag, and remove flagged records
+test <- tempCDW %>%
+  dplyr::mutate(
+    limitingDist = round(((pi^2)*(equivalentLogDiameter^2))/(8*3*volumeFactor), digits=2)
+  ) %>%
+  dplyr::mutate(
+    limDistQF = case_when(
+      is.na(limitingDist) ~ 0,
+      logDistance > limitingDist ~ 1,
+      TRUE ~ 0
+    )
+  ) %>%
+  dplyr::filter(limDistQF==0)
+
+
+
+
+
 
 ```
 

@@ -1,38 +1,44 @@
 ---
-title: 'MEE Worked Example: Meier et al. 2022'
-author: "Courtney L. Meier"
-date: "`r Sys.Date()`"
+title: "MEE Worked Example: Meier et al. 2022"
+author: "Courtney L. Meier, Katherine M. Thibault, and David T. Barnett"
+date: "`r format(Sys.Date(), format = '%B %d, %Y')`"
 output: html_document
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 
-#   Load required CRAN libraries
-# library(devtools)
-library(dplyr)
-library(DT)
-library(ggplot2)
-library(neonUtilities)
+##  Load required CRAN libraries
+library(devtools) #--> Load packages from Github not available on CRAN
+library(DT) #--> Data Table display tools for html output
+library(glue)
+library(neonUtilities) #--> Tools to retrieve data from the NEON Portal
 library(plotly)
-library(stringr)
-library(tidyr)
+library(tidyverse)
 
-##  Install and load geoNEON package from Github; required to programmatically access TOS Spatial Data
-# devtools::install_github('NEONScience/NEON-geolocation/geoNEON', dependencies=TRUE)
-library(geoNEON)
+##  Install packages from Github
+# devtools::install_github('NEONScience/NEON-geolocation/geoNEON', dependencies = TRUE)
+library(geoNEON) #--> Required to programmatically access TOS Spatial Data
+# devtools::install_github('NEONScience/NEON-OS-data-processing/neonOS', dependencies = TRUE)
+library(neonOS) #--> functions for basic quality checks, such as duplicate checks
 
 ```
 
 
-### Introduction
+## Introduction
 
 The NEON Terrestrial Observation System (TOS) data products are frequently spatially integrated at multiple scales, from the site level to the level of relatively small 'sampling cells' that occur within plots (see Supporting Information, Table 3). The purpose of this worked example is to illustrate this spatial integration, and to show how a data user can work with two TOS data products at different spatial scales in order to draw scientific insight. We focus on the 'Coarse downed wood log survey' data product (DP1.10010.001) and the 'Small mammal box trapping' data product (DP1.10072.001), and we show how to link data at both the plot and site spatial scales. 
 
 
-### Load data from the NEON Data Portal
+## Load data from the NEON Data Portal
+
+### Load Coarse Downed Wood Tally Data
 
 At sites with sufficient logs >= 2 cm diameter, the 'Coarse downed wood log survey' data product, hereafter referred to as 'CDW Tally', is generated from both Distributed and Tower plots on a 5 year interval. However, sampling of Distributed and Tower plots is staggered through time such that each plot type is sampled every 2-3 years within a site. Distributed plots are allocated across each site in proportion to the area of dominant NLCD Vegetation Classes, and these plots allow creating statistically robust site-level estimates of both CDW volume (derived from tallies), and small mammal density. The Small Mammal (MAM) data product is generated annually from the majority of TOS sites, and MAM data are collected from grids that are collocated with Distributed base plots that also support CDW sampling. Because MAM grids are not collocated with Tower plots, the first tasks for this example are to identify which NEON sites have produced CDW Tally data, identify several forested sites with recent Distributed plot data for the example, and then identify which Distributed plotIDs are collocated with MAM sampling. 
+
+The NEON 'Coarse downed wood log survey' data product citation is:
+
+- NEON (National Ecological Observatory Network). Coarse downed wood log survey, RELEASE-2022 (DP1.10010.001). https://doi.org/10.48443/54dd-9407. Dataset accessed from https://data.neonscience.org on `r format(Sys.Date(), format = "%B %d, %Y")`
 
 ``` {r cdwLoadData, results=FALSE, message=FALSE}
 ### Load CDW Tally data for last 6 years from NEON Data Portal for all sites and dates; use of a user-specific API token is not required, but can give faster download speeds from the NEON Portal
@@ -125,22 +131,25 @@ tempCDW <- tempCDW %>%
 ```
 
 
-Need a section here for loading MAM data
+### Load Small Mammal Data
 
-``` {r mamLoadData, results=FALSE}
+``` {r mamLoadData, results=FALSE, message=FALSE}
 
 
 ```
 
 
 
-### Data QC Checks
+## Data QC Checks
+
+### Coarse Downed Wood Tally QC Checks
 
 For CDW tally data, prior to analysis it is important to:
 - Check for duplicates, and
 - Verify that all tallied logs meet LIDS tally criteria based on reported `equivalentLogDiameter`, `logDistance`, and `volumeFactor` data. The `equivalentLogDiameter` is used so that round and elliptical logs (typically highly decayed) can be assessed with the same criteria.
+- Remove any tallied logs with a `logDistance` greater than the protocol-specified transect length.
 
-``` {r cdwDataQC}
+``` {r cdwDataQC, results=FALSE, message=FALSE}
 ### Check for individualID duplicates; duplicate checks are important because log counts are used to estimate CDW volume
 #   First, construct an individualID for logs < 10 cm diameter that are not tagged; smaller logs are not tagged and are given a unique temporary logID beginning with 'L' since they are less likely to persist over the 5-year CDW Tally measurement interval; second, construct a primary key from plotID, date, lidsAzimuth, and individualID
 tempCDW <- tempCDW %>%
@@ -231,7 +240,7 @@ tempCDW <- tempCDW %>%
 # }
 
 #   Check logDistance, flag, and remove flagged records
-test <- tempCDW %>%
+tempCDW <- tempCDW %>%
   dplyr::mutate(
     limitingDist = round(((pi^2)*(equivalentLogDiameter^2))/(8*3*volumeFactor), digits=2)
   ) %>%
@@ -244,8 +253,86 @@ test <- tempCDW %>%
   ) %>%
   dplyr::filter(limDistQF==0)
 
+```
 
 
+
+### Small Mammal Data QC Checks
+
+``` {r}
+
+
+```
+
+
+
+
+## Analysis of Spatially Integrated Data Products at Plot and Site Scales
+
+In this section, we generate Coarse Downed Wood volume estimates and Small Mammal abundance estimates at both plot and site scales in order to demonstrate the spatial integration of NEON TOS data products.
+
+
+### Create Coarse Downed Wood Volume Datasets
+
+Using the LIDS method (Affleck 2008, 2010), CDW volume is calculated at the plot scale as:
+
+`CDW volume density = F * n` (m^3^/hectare); 
+
+where `F` is the site-specific volume factor, and `n` is the number of qualifying logs tallied across all three transects originating from the centroid of the plot. Importantly, at the plot scale, CDW volume density is compared with collocated with Small Mammal abundance data at a maximum of n=6 plots per site.
+
+At the site scale, mean CDW volume (m^3^/hectare) is simply the mean of the plot scale values; the mean site-scale parameter is robust because of the spatially-balanced, stratified-random nature of the TOS Spatial Design. When comparing CDW volume and Small Mammal abundance at the site scale, data from all Distributed plots are used for the calculation.
+
+``` {r cdwVolumeEstimates, message=FALSE}
+### Calculate CDW volume for each plotID in the cleaned dataset
+#   First, focus on plots with targetTaxaPresent=="Y" --> i.e., at least one qualifying log was tallied within the plot
+plotCdwVol <- tempCDW %>%
+  dplyr::filter(is.na(samplingImpractical) | samplingImpractical=="OK") %>% #--> Remove SamplingImpractical!="OK"
+  dplyr::filter(targetTaxaPresent=="Y") %>% #--> Remove records for transects with no logs
+  dplyr::group_by(domainID, siteID, volumeFactor, plotID) %>%
+  dplyr::summarise(
+    logCount = n()
+  ) %>%
+  dplyr::mutate(cdwVol = volumeFactor * logCount)
+
+#   Second, identify plots with all three transects with no logs and bind to log count output from above
+noLogs <- tempCDW %>%
+  dplyr::filter(targetTaxaPresent=="N") %>%
+  dplyr::group_by(domainID, siteID, volumeFactor, plotID) %>%
+  dplyr::summarise(
+    transectCount = n() #--> Identify plots with all 3 transects with ttP=="N"
+  ) %>%
+  dplyr::filter(transectCount==3) %>%
+  dplyr::mutate(
+    logCount = 0,
+    cdwVol = 0
+  ) %>%
+  dplyr::select(-transectCount)
+
+plotCdwVol <- plotCdwVol %>%
+  dplyr::bind_rows(noLogs) %>%
+  dplyr::arrange(domainID, siteID, plotID)
+
+#   Finally, add back mammalGrid collocation data
+temp <- tempCDW %>%
+  dplyr::select(plotID, subtype) %>%
+  dplyr::distinct()
+
+plotCdwVol <- plotCdwVol %>%
+  dplyr::left_join(temp, by = "plotID")
+
+
+##  Display table of plot-level CDW volume estimates
+DT::datatable(
+  data = plotCdwVol,
+  filter = "none",
+  rownames = FALSE,
+  options = list(pageLength = 10),
+  caption = "CDW volume density estimates by plotID for selected sites."
+)
+
+
+
+### Calculate CDW Volume for each siteID in the cleaned dataset
 
 
 
@@ -253,6 +340,11 @@ test <- tempCDW %>%
 
 
 
+## References
+
+Affleck, D.L.R. (2008) A line intersect distance sampling strategy for downed wood inventory. Canadian Journal of Forest Research, 38, 2262-2273.
+
+Affleck, D.L.R. (2010) On the efficiency of line intersect distance sampling. Canadian Journal of Forest Research, 40, 1086-1094.
 
 
 

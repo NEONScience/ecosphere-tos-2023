@@ -297,10 +297,83 @@ tempCDW <- tempCDW %>%
 
 
 
-### Small Mammal Data QC Checks
+### Small Mammal Box Trapping Data QC: Check for duplicates
 
-``` {r}
+- `mam_perplotnight` - records with the same plot and date combination (as captured in an auto-generated nightuid).  
+- `mam_pertrapnight` - records with the same nightuid, trap coordinate, and tagID or individualCode; note that the standard function used to remove duplicates cannot account for multiple captures of untagged individuals in a single trap.
 
+``` {r mamDupeChecks, results=FALSE}
+### First, check mam_perplotnight table by nightuid using standard removeDups function
+mam_plotNight_nodups <- neonOS::removeDups(
+  data = mam_perplotnight,
+  variables = variables_10072,
+  table = "mam_perplotnight"
+)
+#-->  Running this check generated the message: Primary key fields contain NA values and/or empty strings. Results may be unreliable; check input data carefully. - followed by an error message
+
+##  To troubleshoot, first query the table to find the problematic records
+problems <- which(is.na(mam_perplotnight$nightuid))
+
+#   Next, check the mam_pertrapnight table to see if there are corresponding records that might have a nightuid
+temp <- mam_pertrapnight %>%
+  dplyr::filter(
+    plotID %in% mam_perplotnight$plotID[problems] & collectDate %in% mam_perplotnight$collectDate[problems]
+  )
+#--> Since the remaining fields were populated and there are captures for each, these records appear to represent a valid night of trapping. So, assign custom temporary nightuids in both tables and let NEON staff know about the issue: (https://www.neonscience.org/about/contact-us).
+
+#   Create custom nightuids for duplicates identified above that are missing primary key value
+mam_perplotnight_adj <- mam_perplotnight %>%
+  dplyr::mutate(nightuid = paste(plotID, '_', collectDate, sep = ''))
+
+mam_pertrapnight_adj <- mam_pertrapnight %>% 
+  dplyr::mutate(nightuid = paste(plotID, '_', collectDate, sep = ''))
+
+#   Re-run the duplicate removal function
+mam_plotNight_nodups <- neonOS::removeDups(
+  data = mam_perplotnight_adj,
+  variables = variables_10072,
+  table = "mam_perplotnight"
+)
+#--> No duplicate key values found
+
+
+
+### Second, check the mam_pertrapnight table by nightuid and trapcoordinate using the standard removeDups function. Note that RELEASE 2022 contains ~142K records for theSites downloaded, so this operation can take some time.
+#   In rare cases, multiple animals can be captured in a single trap on the same night and not all receive unique tagIDs or individualCodes. This means that the duplicate function is not effective for these records; here, we remove these records prior to running the standard check, and we then add these records back to the data frame afterwards.
+mam_trapNight_multipleCaps <- mam_pertrapnight_adj %>% 
+  dplyr::filter(
+    trapStatus == "4 - more than 1 capture in one trap" & is.na(tagID) & is.na(individualCode)
+  )
+
+mam_trapNight_remainingRecords <- mam_pertrapnight_adj %>% 
+  dplyr::filter(!(uid %in% mam_trapNight_multipleCaps$uid))
+
+mam_trapNight_nodups <- neonOS::removeDups(
+  data = mam_trapNight_remainingRecords,
+  variables = variables_10072,
+  table = "mam_pertrapnight"
+) 
+#-->  Output: 2 unresolveable duplicates flagged with duplicateRecordQF=2
+
+
+##  Follow-up trouble-shooting to deal with unresolveable duplicates
+#   Check for unexpected NAs in primary keys
+which(is.na(mam_pertrapnight_adj$nightuid)) #--> yields 0 
+which(is.na(mam_pertrapnight_adj$trapCoordinate)) #--> yields 0
+#--> Two lines above mean that trapID and individualCode are the source of the NAs, which is expected based on the protocol
+
+#   Next, check that the unresolved duplicates will not impact the intended analyses
+dupCheck <- mam_trapNight_nodups %>% 
+  dplyr::filter(
+    duplicateRecordQF == 2 & trapStatus != "4 - more than 1 capture in one trap"
+  )
+#--> No records in the set, so these unresolved duplicates will not impact the intended analyses
+
+
+##  Add multiple capture records back to dataset
+mam_trapNight_nodups <- mam_trapNight_nodups %>%
+  dplyr::mutate(collectDate = as.Date(collectDate)) %>%
+  dplyr::bind_rows(mam_trapNight_multipleCaps)
 
 ```
 
@@ -380,11 +453,26 @@ DT::datatable(
 
 
 
+### Create Small Mammal Density datasets
+
+Here, we employ the minimum number known alive (MNKA) approach to indicate total small mammal abundance - e.g., Slade & Blair (2000). This approach assumes that a marked individual is present at all sampling points between its first and last capture dates, even if it wasn't actually captured in those interim trapping sessions.
+
+``` {r mamAbundanceEstimates, results=FALSE}
+#--> bring in code starting with line 122
+
+
+```
+
+
+
+
 ## References
 
-Affleck, D.L.R. (2008) A line intersect distance sampling strategy for downed wood inventory. Canadian Journal of Forest Research, 38, 2262-2273.
+Affleck, D.L.R. (2008) A line intersect distance sampling strategy for downed wood inventory. _Canadian Journal of Forest Research_, 38, 2262-2273.
 
-Affleck, D.L.R. (2010) On the efficiency of line intersect distance sampling. Canadian Journal of Forest Research, 40, 1086-1094.
+Affleck, D.L.R. (2010) On the efficiency of line intersect distance sampling. _Canadian Journal of Forest Research_, 40, 1086-1094.
+
+Slade, N.A. and Blair, S.M. (2000) An empirical test of using counts of individuals captured as indices of population size. _Journal of Mammalogy_, 81, 1035–1045.
 
 
 

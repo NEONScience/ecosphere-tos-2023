@@ -32,6 +32,8 @@ The NEON Terrestrial Observation System (TOS) data products are frequently spati
 
 ## Load data from the NEON Data Portal
 
+- Note: When retrieving data from the NEON API using the `neonUtilities` functions (see code chunks below), use of the `token` argument allows authentication with a user-specific API token. Use of a token is not required, but tokens provide faster download speeds and help NEON to measure data use for reporting to the NSF.
+
 ### Load Coarse Downed Wood Tally Data
 
 At sites with sufficient logs >= 2 cm diameter, the 'Coarse downed wood log survey' data product, hereafter referred to as 'CDW Tally', is generated from both Distributed and Tower plots on a 5 year interval. However, sampling of Distributed and Tower plots is staggered through time such that each plot type is sampled every 2-3 years within a site. Distributed plots are allocated across each site in proportion to the area of dominant NLCD Vegetation Classes, and these plots allow creating statistically robust site-level estimates of both CDW volume (derived from tallies), and small mammal density. The Small Mammal (MAM) data product is generated annually from the majority of TOS sites, and MAM data are collected from grids that are collocated with Distributed base plots that also support CDW sampling. Because MAM grids are not collocated with Tower plots, the first tasks for this example are to identify which NEON sites have produced CDW Tally data, identify several forested sites with recent Distributed plot data for the example, and then identify which Distributed plotIDs are collocated with MAM sampling. 
@@ -40,8 +42,10 @@ The NEON 'Coarse downed wood log survey' data product citation is:
 
 - NEON (National Ecological Observatory Network). Coarse downed wood log survey, RELEASE-2022 (DP1.10010.001). https://doi.org/10.48443/54dd-9407. Dataset accessed from https://data.neonscience.org on `r format(Sys.Date(), format = "%B %d, %Y")`
 
+
 ``` {r cdwLoadData, results=FALSE, message=FALSE}
-### Load CDW Tally data for last 6 years from NEON Data Portal for all sites and dates; use of a user-specific API token is not required, but can give faster download speeds from the NEON Portal
+### Retrieve CDW Tally data for last 6 years from NEON Data Portal for all sites and dates
+
 # cdwDP <- neonUtilities::loadByProduct(
 #   dpID = "DP1.10010.001",
 #   site = "all",
@@ -54,11 +58,11 @@ The NEON 'Coarse downed wood log survey' data product citation is:
 #   token = Sys.getenv('NEON_PAT')
 # )
 # 
-# #   Extract the field tally data from the download list, and save for quicker read-in during dev --> remove saving later
+# #   Extract the field tally data from the download list, and save for quicker read-in during dev --> remove upon submission
 # cdw <- cdwDP$cdw_fieldtally
 # saveRDS(cdw, file = "cdw_fieldTally_2016-2021.RDS")
 
-#   Read in saved data for continued dev work
+#   Read in saved data for continued dev work --> remove this code upon submission
 cdw <- readRDS(file = "cdw_fieldTally_2016-2021.RDS")
 
 #   Summarise data to identify 5-6 sites with recent CDW Tally data from Distributed plots that can be paired with MAM data; for demonstration purposes, goal is to choose a small number of forested sites that span a range of habitats
@@ -133,7 +137,43 @@ tempCDW <- tempCDW %>%
 
 ### Load Small Mammal Data
 
+Small Mammal sampling grids (n=3 to n=6 per site) are collocated with Distributed base plots that support multiple TOS protocols (including Coarse Downed Wood), and grids are sampled one to several times per year. Similar to Distributed base plots, mammal grids are allocated using a stratified random design informed by NLCD Vegetation Class.
+
+The NEON 'Small mammal box trapping' data product citation is:
+
+- NEON (National Ecological Observatory Network). Small mammal box trapping, RELEASE-2022 (DP1.10072.001). https://doi.org/10.48443/h3dk-3a71. Dataset accessed from https://data.neonscience.org on `r format(Sys.Date(), format = "%B %d, %Y")`
+
+
 ``` {r mamLoadData, results=FALSE, message=FALSE}
+### Retrieve small mammal box trapping data for same sites and date range as retrieved for CDW
+# mamDP <- neonUtilities::loadByProduct(
+#   dpID = "DP1.10072.001",
+#   site = theSites, #--> same sites identified for CDW
+#   startdate = "2016-01",
+#   enddate = "2021-12",
+#   package = "basic",
+#   release = "RELEASE-2022",
+#   tabl = "all",
+#   check.size = FALSE,
+#   token = Sys.getenv('NEON_PAT')
+# )
+# 
+# #   For dev work, save to RDS format --> remove this code upon submission
+# saveRDS(mamDP, file = "mam_allTables_2016-2021.RDS")
+
+#   Read in data stored for dev work --> remove this code upon submission
+mamDP <- readRDS(file = "mam_allTables_2016-2021.RDS")
+
+#   Convert list tables to dataframes in the Global environment
+list2env(mamDP, envir=.GlobalEnv)
+
+
+
+### Read in master SMALL_MAMMAL taxon table via the NEON API
+#   https://www.neonscience.org/resources/learning-hub/tutorials/neon-api-usage
+#   using the verbose option to get the taxonProtocolCategory field
+mam.req <- httr::GET("https://data.neonscience.org/api/v0/taxonomy/?taxonTypeCode=SMALL_MAMMAL&verbose=true&offset=0&limit=1000")
+mam.list <- jsonlite::fromJSON(httr::content(mam.req, as="text"))
 
 
 ```

@@ -59,7 +59,7 @@ list2env(dat, envir=.GlobalEnv)
 mam.req <- GET("https://data.neonscience.org/api/v0/taxonomy/?taxonTypeCode=SMALL_MAMMAL&verbose=true&offset=0&limit=1000")
 mam.list <- jsonlite::fromJSON(content(mam.req, as="text"))
 
-print("Data downloaded! Please don't forget to cite these data propoerly!")
+print("Data downloaded! Please don't forget to cite these data properly!")
 
 ```
 

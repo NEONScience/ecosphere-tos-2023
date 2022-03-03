@@ -469,7 +469,7 @@ Here, we employ the minimum number known alive (MNKA) approach to indicate total
 
 ``` {r mamFinalizeDatasets, results='asis', message=FALSE}
 ### Create eventID grouping variable using mam_plotNight data and add to mam_trapNight data
-#   Assign the same eventID to each record with an endDate no more than 10 days later than the previously created record
+#   Prior to 2021, eventIDs were not created for MAM data. For records created in 2020 or earlier, assign the same eventID to each record with an endDate no more than 10 days later than the previously created record
 mam_plotNight_nodups <- mam_plotNight_nodups %>%
   dplyr::mutate(
     year = as.integer(format(collectDate, "%Y")),

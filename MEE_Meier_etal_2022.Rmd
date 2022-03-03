@@ -10,6 +10,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ##  Load required CRAN libraries
 library(devtools) #--> Load packages from Github not available on CRAN
+library(data.table)
 library(DT) #--> Data Table display tools for html output
 library(glue)
 library(neonUtilities) #--> Tools to retrieve data from the NEON Portal
@@ -58,7 +59,7 @@ The NEON 'Coarse downed wood log survey' data product citation is:
 #   token = Sys.getenv('NEON_PAT')
 # )
 # 
-# #   Extract the field tally data from the download list, and save for quicker read-in during dev --> remove upon submission
+# #   Extract the field tally data from the download list, and save for quicker read-in
 # cdw <- cdwDP$cdw_fieldtally
 # saveRDS(cdw, file = "cdw_fieldTally_2016-2021.RDS")
 
@@ -158,10 +159,10 @@ The NEON 'Small mammal box trapping' data product citation is:
 #   token = Sys.getenv('NEON_PAT')
 # )
 # 
-# #   For dev work, save to RDS format --> remove this code upon submission
+# #   Save to RDS format for quicker read-in
 # saveRDS(mamDP, file = "mam_allTables_2016-2021.RDS")
 
-#   Read in data stored for dev work --> remove this code upon submission
+#   Read in stored MAM data
 mamDP <- readRDS(file = "mam_allTables_2016-2021.RDS")
 
 #   Convert list tables to dataframes in the Global environment

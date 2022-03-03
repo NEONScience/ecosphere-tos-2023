@@ -537,9 +537,9 @@ captures <- mam_trapNight_nodups %>%
 
 ##  Fourth, following the 'Minimum Number Known Alive' (MNKA) approach (Slade & Blair, 2000), we assume that a marked individual is present in all sampling bouts between its first and last capture dates, even if it wasn't actually captured in those intervening bouts. To make the dataset meet this assumption, we add those implicit records to the dataset to make them explicit.
 #   Generate a column of all of the unique tagIDs included in the dataset
-# uTags <- captures %>% 
-#   dplyr::select(tagID) %>% 
-#   dplyr::filter(!is.na(tagID)) %>% 
+# uTags <- captures %>%
+#   dplyr::select(tagID) %>%
+#   dplyr::filter(!is.na(tagID)) %>%
 #   dplyr::distinct()
 # 
 # #   Create empty data frame to populate with 'for()' loop output
@@ -552,15 +552,15 @@ captures <- mam_trapNight_nodups %>%
 #   lastCap <- as.Date(max(temp$collectDate), "YYYY-MM-DD", tz = "UTC")
 #   possibleDates <- seq(as.Date(firstCap), as.Date(lastCap), by="days")
 #   plots <- unique(temp$plotID)
-#   potentialNights <- mam_plotNight_nodups %>% 
-#     dplyr::filter(as.character(collectDate) %in% as.character(possibleDates) & 
-#              plotID %in% plots) %>% 
-#     dplyr::select(nightuid,plotID, collectDate) %>% 
+#   potentialNights <- mam_plotNight_nodups %>%
+#     dplyr::filter(as.character(collectDate) %in% as.character(possibleDates) &
+#              plotID %in% plots) %>%
+#     dplyr::select(nightuid,plotID, collectDate) %>%
 #     dplyr::mutate(tagID = i)
 #   temp2 <- dplyr::left_join(potentialNights, temp)
 #   capsNew <- dplyr::bind_rows(capsNew, temp2)
 # }
-#  
+# 
 # #   To avoid time-consuming processing, save a copy
 # saveRDS(capsNew, file = "mam_final_dataset.RDS")
 
@@ -578,15 +578,14 @@ capsNew <- capsNew %>%
     mam_plotNight_nodups %>%
       dplyr::select(eventID, nightuid),
     by = "nightuid"
-  )
+  ) %>%
+  dplyr::relocate(eventID, .after = collectDate) %>%
+  dplyr::arrange(eventID, plotID, collectDate)
 
 ```
 
 ``` {r mamDensityCalculation, results='asis', message=FALSE}
 ### Define function to calculate MNKA for each plot within bout; 'plotsOI' is a required input vector of plotIDs for which MNKA per plot per bout is desired.
-
-#--> Kate, what are units of output? # individuals per hectare? --------------------------------------------->####
-
 mnka_per_plot_per_bout <- function(capture_data, plotsOI) {
   caps <- capture_data %>% 
     dplyr::filter(plotID %in% plotsOI)
@@ -601,6 +600,7 @@ mnka_per_plot_per_bout <- function(capture_data, plotsOI) {
   
   return(mnka_by_plot_bout)
 }
+#--> Output is MNKA (count/hectare), based on 1 ha size of trapping grid
 
 
 

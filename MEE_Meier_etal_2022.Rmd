@@ -144,7 +144,7 @@ The NEON 'Small mammal box trapping' data product citation is:
 - NEON (National Ecological Observatory Network). Small mammal box trapping, RELEASE-2022 (DP1.10072.001). https://doi.org/10.48443/h3dk-3a71. Dataset accessed from https://data.neonscience.org on `r format(Sys.Date(), format = "%B %d, %Y")`
 
 
-``` {r mamLoadData, results=FALSE, message=FALSE}
+``` {r mamLoadData, results=FALSE, message=FALSE, warning=FALSE}
 ### Retrieve small mammal box trapping data for same sites and date range as retrieved for CDW
 # mamDP <- neonUtilities::loadByProduct(
 #   dpID = "DP1.10072.001",
@@ -306,7 +306,7 @@ filterCDW <- tempCDW %>%
 - `mam_perplotnight` - records with the same plot and date combination (as captured in an auto-generated nightuid).  
 - `mam_pertrapnight` - records with the same nightuid, trap coordinate, and tagID or individualCode; note that the standard function used to remove duplicates cannot account for multiple captures of untagged individuals in a single trap.
 
-``` {r mamDupeChecks, results=FALSE}
+``` {r mamDupeChecks, results=FALSE, message=FALSE, warning=FALSE}
 ### First, check mam_perplotnight table by nightuid using standard removeDups function
 mam_plotNight_nodups <- neonOS::removeDups(
   data = mam_perplotnight,
@@ -469,17 +469,32 @@ Here, we employ the minimum number known alive (MNKA) approach to indicate total
 
 ``` {r mamFinalizeDatasets, results='asis', message=FALSE}
 ### Create eventID grouping variable using mam_plotNight data and add to mam_trapNight data
-#   Assign the same eventID to each record created within a 14 day window
-mam_plotNight_nodups <- mam_plotNight_nodups %>% 
-  dplyr::group_by(siteID) %>% 
+#   Assign the same eventID to each record with an endDate no more than 10 days later than the previously created record
+mam_plotNight_nodups <- mam_plotNight_nodups %>%
   dplyr::mutate(
-    date = lubridate::ymd(collectDate),
-    group = cut(date, "14 days")
+    year = as.integer(format(collectDate, "%Y")),
+    .before = eventID
+  ) %>%
+  dplyr::group_by(siteID, year) %>%
+  dplyr::mutate(
+    priorEndDate = data.table::shift(endDate, fill = endDate[1]),
+    diffDays = difftime(endDate, priorEndDate, units = "days"),
+    boutIncrement = ifelse(diffDays >= 10, 1, 0),
+    boutNum = cumsum(boutIncrement),
+    .after = endDate
+  ) %>%
+  dplyr::group_by(siteID, year, boutNum) %>%
+  dplyr::mutate(
+    weekBoutBegan = lubridate::isoweek(min(endDate)),
+    eventID = case_when(
+      is.na(eventID) ~ paste(siteID, year, weekBoutBegan, sep = "."),
+      TRUE ~ eventID
+    ),
+    .after = boutNum
   ) %>%
   dplyr::ungroup() %>%
-  dplyr::mutate(
-    eventID = paste0(siteID, "_", group)
-  )
+  dplyr::select(-priorEndDate, -diffDays, -boutIncrement, -boutNum)
+#--> Above, shift() defaults to type = "lag", which returns the previous row value for the specified column
 
 #   Add nightuid and eventID from mam_plotNight_nodups to mam_trapNight_nodups
 mam_trapNight_nodups <- mam_trapNight_nodups %>%

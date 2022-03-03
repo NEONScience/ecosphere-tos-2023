@@ -514,13 +514,9 @@ targetTaxa <- mam.list$data %>%
 
 
 ##  Third, simplify dataset to targetTaxa and core fields needed for analysis
-#   Define core fields for analysis
-coreFields <- c("uid", "nightuid", "plotID", "collectDate", "tagID")
-
-#   Filter dataset
 captures <- mam_trapNight_nodups %>% 
   dplyr::filter(grepl("capture", trapStatus) & taxonID %in% targetTaxa$taxonID) %>% 
-  dplyr::select(all_of(coreFields))
+  dplyr::select(uid, nightuid, plotID, collectDate, tagID)
 
 
 ##  Fourth, following the 'Minimum Number Known Alive' (MNKA) approach (Slade & Blair, 2000), we assume that a marked individual is present in all sampling bouts between its first and last capture dates, even if it wasn't actually captured in those intervening bouts. To make the dataset meet this assumption, we add those implicit records to the dataset to make them explicit.

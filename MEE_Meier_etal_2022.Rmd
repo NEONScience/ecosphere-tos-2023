@@ -258,7 +258,9 @@ tempCDW <- tempCDW %>%
   )
 
 
-##  Log Distance: Check for values that exceed maximum transect length from protocol, flag, and remove
+
+### Tally QC checks: Verify that logs in the dataset should be tallied based on protocol criteria
+##  Log Distance: Check for values that exceed maximum transect length as defined in protocol, then flag
 tempCDW <- tempCDW %>%
   dplyr::mutate(
     logDistQF = case_when(
@@ -266,20 +268,15 @@ tempCDW <- tempCDW %>%
       logDistance > transectLength ~ 1,
       TRUE ~ 0
     )
-  ) %>%
-  dplyr::filter(logDistQF==0)
+  ) 
 
 
-
-### Tally QC checks: Verify log should be tallied based on reported diameter, logDistance, and volumeFactor
-##  Check whether logDistance is < limitingDistance (it should be) based on equivalentLogDiameter
-#   Define function to calculate limiting distance
-# dlim <- function(RD, transectNum, fValue){
-#   d = round(((pi^2)*(RD^2))/(8*transectNum*fValue), digits=2)
-#   return(d)
-# }
-
-#   Check logDistance, flag, and remove flagged records
+##  Check whether logDistance is <= limitingDistance (it should be) based on equivalentLogDiameter, and flag
+#   Use formula to calculate limiting distance from Affleck 2010, Appendix A:
+#   limitingDist = ((pi^2)*(roundDiameter^2))/(8*transectNum*fValue), where
+#   roundDiameter = round diameter of the log (cm), taken from the equivalentLogDiameter field in NEON data
+#   transectNum = integer value for the number of transects established from a survey point (3 for NEON plots),
+#   fValue = the F value assigned at the site level, taken from the volumeFactor field in NEON data
 tempCDW <- tempCDW %>%
   dplyr::mutate(
     limitingDist = round(((pi^2)*(equivalentLogDiameter^2))/(8*3*volumeFactor), digits=2)
@@ -290,8 +287,15 @@ tempCDW <- tempCDW %>%
       logDistance > limitingDist ~ 1,
       TRUE ~ 0
     )
-  ) %>%
-  dplyr::filter(limDistQF==0)
+  )
+  
+
+##  Filter out flagged records corresponding to logs that should not have been tallied
+filterCDW <- tempCDW %>%
+  dplyr::filter(
+    limDistQF==0,
+    logDistQF==0
+  )
 
 ```
 
@@ -393,12 +397,12 @@ Using the LIDS method (Affleck 2008, 2010), CDW volume is calculated at the plot
 
 where `F` is the site-specific volume factor, and `n` is the number of qualifying logs tallied across all three transects originating from the centroid of the plot. Importantly, at the plot scale, CDW volume density is compared with collocated with Small Mammal abundance data at a maximum of n=6 plots per site.
 
-At the site scale, mean CDW volume (m^3^/hectare) is simply the mean of the plot scale values; the mean site-scale parameter is robust because of the spatially-balanced, stratified-random nature of the TOS Spatial Design. When comparing CDW volume and Small Mammal abundance at the site scale, data from all Distributed plots are used for the calculation.
+At the site scale, mean CDW volume (m^3^/hectare) is simply the mean of the plot scale values; the mean site-scale parameter is robust because of the spatially-balanced, stratified-random nature of the TOS Spatial Design. When comparing CDW volume and Small Mammal abundance at the site scale, CDW data from all Distributed plots are used for the calculation.
 
 ``` {r cdwVolumeEstimates, message=FALSE}
 ### Calculate CDW volume for each plotID in the cleaned dataset
 #   First, focus on plots with targetTaxaPresent=="Y" --> i.e., at least one qualifying log was tallied within the plot
-plotCdwVol <- tempCDW %>%
+plotCdwVol <- filterCDW %>%
   dplyr::filter(is.na(samplingImpractical) | samplingImpractical=="OK") %>% #--> Remove SamplingImpractical!="OK"
   dplyr::filter(targetTaxaPresent=="Y") %>% #--> Remove records for transects with no logs
   dplyr::group_by(domainID, siteID, volumeFactor, plotID) %>%
@@ -408,7 +412,7 @@ plotCdwVol <- tempCDW %>%
   dplyr::mutate(cdwVol = volumeFactor * logCount)
 
 #   Second, identify plots with all three transects with no logs and bind to log count output from above
-noLogs <- tempCDW %>%
+noLogs <- filterCDW %>%
   dplyr::filter(targetTaxaPresent=="N") %>%
   dplyr::group_by(domainID, siteID, volumeFactor, plotID) %>%
   dplyr::summarise(
@@ -446,7 +450,13 @@ DT::datatable(
 
 
 ### Calculate CDW Volume for each siteID in the cleaned dataset
-
+siteCdwVol <- plotCdwVol %>%
+  dplyr::group_by(domainID, siteID) %>%
+  dplyr::summarise(
+    meanCdwVol = round(mean(cdwVol, na.rm = TRUE), digits = 1),
+    sdCdwVol = round(sd(cdwVol, na.rm = TRUE), digits = 1),
+    nCdwVol = n()
+  )
 
 
 ```
@@ -457,13 +467,114 @@ DT::datatable(
 
 Here, we employ the minimum number known alive (MNKA) approach to indicate total small mammal abundance - e.g., Slade & Blair (2000). This approach assumes that a marked individual is present at all sampling points between its first and last capture dates, even if it wasn't actually captured in those interim trapping sessions.
 
-``` {r mamAbundanceEstimates, results=FALSE}
-#--> bring in code starting with line 122
+``` {r mamFinalizeDatasets, results='asis', message=FALSE}
+### Create eventID grouping variable using mam_plotNight data and add to mam_trapNight data
+#   Assign the same eventID to each record created within a 14 day window
+mam_plotNight_nodups <- mam_plotNight_nodups %>% 
+  dplyr::group_by(siteID) %>% 
+  dplyr::mutate(
+    date = lubridate::ymd(collectDate),
+    group = cut(date, "14 days")
+  ) %>%
+  dplyr::ungroup() %>%
+  dplyr::mutate(
+    eventID = paste0(siteID, "_", group)
+  )
 
+#   Add nightuid and eventID from mam_plotNight_nodups to mam_trapNight_nodups
+mam_trapNight_nodups <- mam_trapNight_nodups %>%
+  dplyr::left_join(
+    mam_plotNight_nodups %>%
+      dplyr::select(nightuid, eventID),
+    by = "nightuid"
+  )
+
+
+
+### Create and finalize Small Mammal capture dataset for selected sites
+##  First, subset trapping data to only the capture records, i.e., the records that describe a captured small mammal, including only those taxa for which the trapping protocol is designed. Subsetting can be done with a simple filtering based on 'trapStatus' and 'taxonProtocolCategory'; however, we first check to ensure all captures have the correct 'trapStatus' - i.e., check if tagIDs exist but trap status does not include "capture"
+problemRecords <- mam_trapNight_nodups %>% 
+  dplyr::filter(
+    !is.na(tagID),
+    !grepl("capture",trapStatus)
+  )
+
+#   If nrow(problemRecords) > 0, update the corresponding trapStatus fields to "5 - capture" or, in the rare case where there are multiple captures in one trap, "4 - more than 1 capture in one trap" - this rare case does not occur in the current dataset, so it is not addressed here
+mam_trapNight_nodups <- mam_trapNight_nodups %>%
+  dplyr::mutate(trapStatus = case_when(
+    uid %in% problemRecords$uid ~ "5 - capture",
+    TRUE ~ trapStatus
+  ))
+
+
+##  Second, create list of target taxa from taxon list 
+targetTaxa <- mam.list$data %>% 
+  dplyr::filter(taxonProtocolCategory == "target") %>%
+  dplyr::select(taxonID)
+
+
+##  Third, simplify dataset to targetTaxa and core fields needed for analysis
+#   Define core fields for analysis
+coreFields <- c("uid", "nightuid", "plotID", "collectDate", "tagID")
+
+#   Filter dataset
+captures <- mam_trapNight_nodups %>% 
+  dplyr::filter(grepl("capture", trapStatus) & taxonID %in% targetTaxa$taxonID) %>% 
+  dplyr::select(all_of(coreFields))
+
+
+##  Fourth, following the 'Minimum Number Known Alive' (MNKA) approach (Slade & Blair, 2000), we assume that a marked individual is present in all sampling bouts between its first and last capture dates, even if it wasn't actually captured in those intervening bouts. To make the dataset meet this assumption, we add those implicit records to the dataset to make them explicit.
+#   Generate a column of all of the unique tagIDs included in the dataset
+# uTags <- captures %>% 
+#   dplyr::select(tagID) %>% 
+#   dplyr::filter(!is.na(tagID)) %>% 
+#   dplyr::distinct()
+# 
+# #   Create empty data frame to populate with 'for()' loop output
+# capsNew <- dplyr::slice(captures, 0)
+# 
+# #   For each tagged individual, add a record for each night of trapping done in the plots in which it was captured between the first and last dates of capture.
+# for (i in uTags$tagID) {
+#   temp <- captures %>% filter(tagID == i)
+#   firstCap <- as.Date(min(temp$collectDate), "YYYY-MM-DD", tz = "UTC")
+#   lastCap <- as.Date(max(temp$collectDate), "YYYY-MM-DD", tz = "UTC")
+#   possibleDates <- seq(as.Date(firstCap), as.Date(lastCap), by="days")
+#   plots <- unique(temp$plotID)
+#   potentialNights <- mam_plotNight_nodups %>% 
+#     dplyr::filter(as.character(collectDate) %in% as.character(possibleDates) & 
+#              plotID %in% plots) %>% 
+#     dplyr::select(nightuid,plotID, collectDate) %>% 
+#     dplyr::mutate(tagID = i)
+#   temp2 <- dplyr::left_join(potentialNights, temp)
+#   capsNew <- dplyr::bind_rows(capsNew, temp2)
+# }
+#  
+# #   To avoid time-consuming processing, save a copy
+# saveRDS(capsNew, file = "mam_final_dataset.RDS")
+
+#   Read in processed capsNew dataset
+capsNew <- readRDS(file = "mam_final_dataset.RDS")
+
+#   Add untagged individuals back to the dataset
+capsNew <- captures %>%
+  dplyr::filter(is.na(tagID)) %>%
+  dplyr::bind_rows(capsNew)
+
+#   Add eventID to enable summarizing by trapping bouts (includes up to 3 nights of trapping for some plots in each bout, 1 night for other plots)
+capsNew <- capsNew %>%
+  dplyr::left_join(
+    mam_plotNight_nodups %>%
+      dplyr::select(eventID, nightuid),
+    by = "nightuid"
+  )
 
 ```
 
+``` {r}
 
+
+
+```
 
 
 ## References
@@ -473,6 +584,3 @@ Affleck, D.L.R. (2008) A line intersect distance sampling strategy for downed wo
 Affleck, D.L.R. (2010) On the efficiency of line intersect distance sampling. _Canadian Journal of Forest Research_, 40, 1086-1094.
 
 Slade, N.A. and Blair, S.M. (2000) An empirical test of using counts of individuals captured as indices of population size. _Journal of Mammalogy_, 81, 1035–1045.
-
-
-

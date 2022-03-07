@@ -441,16 +441,21 @@ plotCdwVol <- plotCdwVol %>%
 
 ##  Display table of plot-level CDW volume estimates
 DT::datatable(
-  data = plotCdwVol,
+  data = plotCdwVol %>% dplyr::rename(
+    "Log Count" = logCount,
+    "CDW Vol (m3/ha)" = cdwVol,
+    "Plot subtype" = subtype
+  ),
   filter = "none",
   rownames = FALSE,
   options = list(pageLength = 10),
-  caption = "CDW volume density estimates by plotID for selected sites and eventIDs."
+  caption = "CDW volume density estimates by plotID for selected sites and eventIDs. The 'Plot subtype' column indicates whether a given CDW plot is collocated with a Small Mammal sampling grid."
 )
 
 
 
-### Calculate CDW Volume for each siteID in the cleaned dataset
+### Calculate CDW Volume for each siteID in the cleaned dataset and display
+#   Calculate site-level mean CDW volume
 siteCdwVol <- plotCdwVol %>%
   dplyr::group_by(domainID, siteID, eventID) %>%
   dplyr::summarise(
@@ -458,6 +463,19 @@ siteCdwVol <- plotCdwVol %>%
     sdCdwVol = round(sd(cdwVol, na.rm = TRUE), digits = 1),
     nCdwVol = n()
   )
+
+#   Display table of site-level CDW volume estimates
+DT::datatable(
+  data = siteCdwVol %>% dplyr::rename(
+    "Mean CDW Vol (m3/ha)" = meanCdwVol,
+    "StdDev CDW Vol" = sdCdwVol,
+    "Plot Number" = nCdwVol
+  ),
+  filter = "none",
+  rownames = FALSE,
+  options = list(pageLength = 10),
+  caption = "CDW volume density estimates by siteID for selected sites and eventIDs."
+)
 
 
 ```
@@ -584,7 +602,7 @@ capsNew <- capsNew %>%
 
 ```
 
-``` {r mamDensityCalculation, results='asis', message=FALSE}
+``` {r mamDensityFunctions, results='asis', message=FALSE}
 ### Define function to calculate MNKA for each plot within bout; 'plotsOI' is a required input vector of plotIDs for which MNKA per plot per bout is desired.
 mnka_per_plot_per_bout <- function(capture_data, plotsOI) {
   caps <- capture_data %>% 
@@ -596,7 +614,14 @@ mnka_per_plot_per_bout <- function(capture_data, plotsOI) {
   
   mnka_by_plot_bout <- ids_by_plot_bout %>%
     dplyr::group_by(eventID, plotID) %>% 
-    dpyr::count()
+    dplyr::count() %>%
+    dplyr::mutate(
+      siteID = stringr::str_extract(eventID, "^[A-Z]{4}"),
+      year = as.numeric(stringr::str_extract(eventID, "20[0-9]{2}")),
+      .before = eventID
+    ) %>%
+    dplyr::ungroup() %>%
+    as.data.frame()
   
   return(mnka_by_plot_bout)
 }
@@ -638,10 +663,28 @@ mnka_per_site <- function(capture_data, plotsOI, sitesOI, timeframe = "bout") {
   }
 }
 
+```
+
+We now employ the MNKA small mammal density functions to calculate MNKA at the plot scale and site scale in order to compare to CDW volume density data calculated above. Because CDW volume does not change rapidly, and small mammal abundance may change substantially both within and among years, here we generate the maximum small mammal abundance for a given plot for a three-year window centered on the year that logs were tallied for CDW.
+
+``` {r mamMnkaEstimates, message=FALSE}
+### Calculate MNKA per plot per bout for all data in processed capsNew dataset and select 3-year window of data appropriate for each site in order to match up with CDW volume data
+plotBoutMNKA <- mnka_per_plot_per_bout(
+  capture_data = capsNew,
+  plotsOI = unique(capsNew$plotID)
+)
+
+#   Create table of MAM years needed by site based on CDW volume data
+mamSiteYears <- plotCdwVol %>%
+  dplyr::ungroup() %>%
+  dplyr::distinct(domainID, siteID, eventID) %>%
+  dplyr::mutate(
+    cdwYear = as.numeric(stringr::str_extract(eventID, "20[0-9]{2}")),
+    minMamYear = cdwYear - 1,
+    maxMamYear = cdwYear + 1
+  )
 
 
-### Use functions to calculate MNKA at plot scale and site scale for same years for which CDW volume data were calculated
-#--> begin again here
 
 
 ```

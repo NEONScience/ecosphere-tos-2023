@@ -787,9 +787,9 @@ siteDF <- siteCdwVol %>%
 
 ### Create graphs of CDW and MAM data at plot and site spatial scales
 
-``` {r generateGraphs}
+``` {r generateGraph-allPlots}
 ### Create graph of CDW volume vs. MAM maximum abundance across all plots and sites
-allPlotsGraph <- ggplot2::ggplot(
+plotsGraph <- ggplot2::ggplot(
   data = plotDF,
   mapping = aes(
     x = cdwVol,
@@ -797,7 +797,7 @@ allPlotsGraph <- ggplot2::ggplot(
   )
 ) +
   ggplot2::geom_point(
-    shape = 21,
+    alpha = 0.5,
     size = 3
   ) +
   ggplot2::geom_smooth() +
@@ -807,10 +807,15 @@ allPlotsGraph <- ggplot2::ggplot(
     title = "Correlation between CDW Volume and Max Small Mammal Abundance at the plot scale across forested sites"
   )
 
-allPlotsGraph
+plotsGraph
+
+```
+
+- Across a selection of close-canopy forested NEON sites, measurements of CDW volume (m^3^/ha) and Small Mammal abundance (count/ha) reveal no clear correlation at the collocated plot-scale.
+- The Pearson's correlation coefficient is: `r cor(plotDF$cdwVol, plotDF$plotMaxAbundance)`.
 
 
-
+``` {r generateGraph-allPlotsBySite}
 ### Create graph of CDW volume vs. MAM maximum abundance across plots within site
 sitePlotsGraph <- ggplot2::ggplot(
   data = plotDF,
@@ -820,20 +825,53 @@ sitePlotsGraph <- ggplot2::ggplot(
   )
 ) +
   ggplot2::geom_point(
-    shape = 21,
+    alpha = 0.5,
     size = 3
   ) +
+  ggplot2::geom_smooth(method = lm) +
   ggplot2::facet_wrap(
     facets = ~siteID,
     ncol = 2,
-    scales = "free_x"
+    scales = "free"
+  ) + 
+  ggplot2::labs(
+    x = "CDW Volume (m3/ha)",
+    y = "Max Small Mammal Abundance (count/ha)",
+    title = "Correlation between CDW Volume and Max Small Mammal Abundance by plot within site"
   )
 
-
+sitePlotsGraph
 
 ```
 
+- Within a selection of close-canopy forested NEON sites, CDW volume (m^3^/ha) and Small Mammal abundance (count/ha) show positive (RMNP, r~Pearson~ = `r cor(plotDF$cdwVol[plotDF$siteID=="RMNP"], plotDF$plotMaxAbundance[plotDF$siteID=="RMNP"])`), negative (ABBY, r~Pearson~ = `r cor(plotDF$cdwVol[plotDF$siteID=="ABBY"], plotDF$plotMaxAbundance[plotDF$siteID=="ABBY"])`), and weak correlation (HARV, JERC, STEI, UKFS).
 
+
+``` {r generateGraph-allSites}
+### Create graph of CDW volume vs. MAM maximum abundance across sites
+sitesGraph <- ggplot2::ggplot(
+  data = siteDF,
+  mapping = aes(
+    x = meanCdwVol,
+    y = siteMaxAbundance,
+  )
+) +
+  ggplot2::geom_point(
+    alpha = 0.5,
+    size = 3
+  ) +
+  ggplot2::geom_smooth(method = lm) +
+  ggplot2::labs(
+    x = "CDW Volume (m3/ha)",
+    y = "Average Max Small Mammal Abundance (count/ha)",
+    title = "Correlation between CDW Volume and average max Small Mammal Abundance across sites"
+  )
+
+sitesGraph
+
+```
+
+- Across a selection of closed-canopy forested NEON sites, CDW volume (m^3^/ha) and Small Mammal abundance (count/ha) show a weak, negative correlation at the site scale (r~Pearson~ = `r cor(siteDF$meanCdwVol, siteDF$siteMaxAbundance)`).
 
 
 ## References

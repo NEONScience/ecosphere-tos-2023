@@ -674,7 +674,7 @@ plotBoutMNKA <- mnka_per_plot_per_bout(
   plotsOI = unique(capsNew$plotID)
 )
 
-#   Create table of MAM years needed by site based on CDW volume data
+#   Create table of MAM data within 3-year windows by site based on year of CDW volume data
 mamSiteYears <- plotCdwVol %>%
   dplyr::ungroup() %>%
   dplyr::distinct(domainID, siteID, eventID) %>%
@@ -684,10 +684,156 @@ mamSiteYears <- plotCdwVol %>%
     maxMamYear = cdwYear + 1
   )
 
+#   Calculate plot-specific MNKA across bouts: Join plotBoutMNKA and mamSiteYears, filter to records within 3-year window centered on CDW measurement year, and determine maximum small mammal abundance for each plot, as well as other per plot metrics
+plotMNKA <- plotBoutMNKA %>%
+  dplyr::left_join(
+    mamSiteYears %>% 
+      dplyr::select(
+        siteID,
+        minMamYear,
+        maxMamYear
+      ),
+    by = "siteID"
+  ) %>%
+  dplyr::filter(
+    year >= minMamYear,
+    year <= maxMamYear
+  ) %>%
+  dplyr::group_by(siteID, plotID) %>%
+  dplyr::summarise(
+    plotMeanAbundance = round(mean(n), digits = 1),
+    plotMedAbundance = median(n),
+    plotMinAbundance = min(n),
+    plotMaxAbundance = max(n),
+    plotBoutCount = n()
+  ) %>%
+  dplyr::ungroup()
+
+
+##  Display table of plot-level MNKA parameters
+DT::datatable(
+  data = plotMNKA %>% dplyr::rename(
+    "Mean Abundance (count/ha)" = plotMeanAbundance,
+    "Median Abundance (count/ha)" = plotMedAbundance,
+    "Min Abundance (count/ha)" = plotMinAbundance,
+    "Max Abundance (count/ha)" = plotMaxAbundance,
+    "Bout Count by Plot" = plotBoutCount
+  ),
+  filter = "none",
+  rownames = FALSE,
+  options = list(pageLength = 10),
+  caption = "Small Mammal abundance metrics (count/ha) by plotID for selected sites for a 3-year window centered on the year that CDW volume was measured."
+)
+
+
+
+### Calculate MNKA metrics per site based on plot-level data
+siteMNKA <- plotMNKA %>%
+  dplyr::group_by(siteID) %>%
+  dplyr::summarise(
+    siteMeanAbundance = round(mean(plotMeanAbundance), digits = 1), #--> calculate mean abundance across plots
+    siteMedAbundance = round(median(plotMedAbundance), digits = 1), #--> calculate median abundance across plots
+    siteMinAbundance = round(mean(plotMinAbundance), digits = 1), #--> calculate average min abundance across plots
+    siteMaxAbundance = round(mean(plotMaxAbundance), digits = 1) #--> calculate average max abundance across plots
+  ) %>%
+  dplyr::ungroup()
+
+
+##  Display table of site-level MNKA parameters
+DT::datatable(
+  data = siteMNKA %>% dplyr::rename(
+    "Mean Abundance (count/ha)" = siteMeanAbundance,
+    "Median Abundance (count/ha)" = siteMedAbundance,
+    "Average Min Abundance (count/ha)" = siteMinAbundance,
+    "Average Max Abundance (count/ha)" = siteMaxAbundance
+  ),
+  filter = "none",
+  rownames = FALSE,
+  options = list(pageLength = 10),
+  caption = "Small Mammal abundance metrics (count/ha) by siteID for selected sites for a 3-year window centered on the year that CDW volume was measured."
+)
+
+```
+
+
+
+### Create unified CDW and MAM datasets
+
+``` {r unifyDataSets, message=FALSE}
+### Join plot-level CDW and MAM datasets 
+plotDF <- plotCdwVol %>%
+  dplyr::left_join(
+    plotMNKA %>% 
+      dplyr::select(-plotBoutCount),
+    by = c("siteID", "plotID")
+  ) %>%
+  dplyr::filter(
+    !is.na(plotMaxAbundance)
+  )
+#--> consider removing removing plot 'subtype' from CDW dataframe since don't need to ping geoNEON to determine collocation; can rely on join with MAM data which is simpler
+
+
+
+### Join site-level CDW and MAM datasets
+siteDF <- siteCdwVol %>%
+  dplyr::left_join(
+    siteMNKA,
+    by = "siteID"
+  )
+
+```
+
+
+
+### Create graphs of CDW and MAM data at plot and site spatial scales
+
+``` {r generateGraphs}
+### Create graph of CDW volume vs. MAM maximum abundance across all plots and sites
+allPlotsGraph <- ggplot2::ggplot(
+  data = plotDF,
+  mapping = aes(
+    x = cdwVol,
+    y = plotMaxAbundance
+  )
+) +
+  ggplot2::geom_point(
+    shape = 21,
+    size = 3
+  ) +
+  ggplot2::geom_smooth() +
+  ggplot2::labs(
+    x = "CDW Volume (m3/ha)",
+    y = "Max Small Mammal Abundance (count/ha)",
+    title = "Correlation between CDW Volume and Max Small Mammal Abundance at the plot scale across forested sites"
+  )
+
+allPlotsGraph
+
+
+
+### Create graph of CDW volume vs. MAM maximum abundance across plots within site
+sitePlotsGraph <- ggplot2::ggplot(
+  data = plotDF,
+  mapping = aes(
+    x = cdwVol,
+    y = plotMaxAbundance
+  )
+) +
+  ggplot2::geom_point(
+    shape = 21,
+    size = 3
+  ) +
+  ggplot2::facet_wrap(
+    facets = ~siteID,
+    ncol = 2,
+    scales = "free_x"
+  )
 
 
 
 ```
+
+
 
 
 ## References

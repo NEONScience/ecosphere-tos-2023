@@ -1,5 +1,5 @@
 ---
-title: "Meier et al. 2022 - Supporting Information File 2: Linking NEON TOS Coarse Downed Wood volume and Small Mammal abundance data at plot and site scales"
+title: "Meier et al. 2022 - Supporting Information File 2: Example linking NEON TOS Coarse Downed Wood volume and Small Mammal abundance data at plot and site scales"
 author: "Courtney L. Meier, Katherine M. Thibault, and David T. Barnett"
 date: "`r format(Sys.Date(), format = '%B %d, %Y')`"
 output: 
@@ -33,12 +33,12 @@ library(neonOS) #--> functions for basic quality checks, such as duplicate check
 
 ## Introduction
 
-The NEON Terrestrial Observation System (TOS) data products are frequently spatially integrated at multiple scales, from the site level to the level of relatively small 'sampling cells' that occur within plots (see Supporting Information, Table 3). The purpose of this worked example is to illustrate this spatial integration, and to show how a data user can work with two TOS data products at different spatial scales in order to draw scientific insight. We focus on the 'Coarse downed wood log survey' data product (DP1.10010.001) and the 'Small mammal box trapping' data product (DP1.10072.001), and we show how to link data at both the plot and site spatial scales. 
+The NEON Terrestrial Observation System (TOS) data products are frequently spatially integrated at multiple scales, from the site level to the level of relatively small 'sampling cells' that occur within plots (see Supporting Information file 1, Table 3). This worked example is a companion piece to our manuscript, _"Spatial and temporal sampling strategy connecting NEON Terrestrial Observation System protocols,"_ and the purpose is to illustrate how a user of NEON data can work with two TOS data products at different spatial scales in order to draw scientific insight. We focus on the 'Coarse downed wood log survey' data product (DP1.10010.001) and the 'Small mammal box trapping' data product (DP1.10072.001), and we show how to link data at both the plot and site spatial scales using R software (https://www.r-project.org/) to download data from the NEON API via the `neonUtilities` package (https://cran.r-project.org/web/packages/neonUtilities/). 
 
 
 ## Load data from the NEON Data Portal
 
-- Note: When retrieving data from the NEON API using the `neonUtilities` functions (see code chunks below), use of the `token` argument allows authentication with a user-specific API token. Use of a token is not required, but tokens provide faster download speeds and help NEON to measure data use for reporting to the NSF.
+Note: When retrieving data from the NEON API using the `neonUtilities` functions (see code chunks below), use of the `token` argument allows authentication with a user-specific API token. Use of a token is not required, but tokens provide faster download speeds and help NEON to measure data use for reporting to the NSF.
 
 ### Load Coarse Downed Wood Tally Data
 
@@ -68,10 +68,10 @@ The NEON 'Coarse downed wood log survey' data product citation is:
 # cdw <- cdwDP$cdw_fieldtally
 # saveRDS(cdw, file = "cdw_fieldTally_2016-2021.RDS")
 
-#   Read in saved data for continued dev work --> remove this code upon submission
+#   Read in data saved via neonUtilities code chunk above
 cdw <- readRDS(file = "cdw_fieldTally_2016-2021.RDS")
 
-#   Summarise data to identify 5-6 sites with recent CDW Tally data from Distributed plots that can be paired with MAM data; for demonstration purposes, goal is to choose a small number of forested sites that span a range of habitats
+#   Summarise data to identify 5-6 sites with recent CDW Tally data from Distributed plots that can be paired with MAM data; for demonstration purposes, goal is to choose a small number of forested sites that span a range of habitats.
 summaryDist <- cdw %>%
   dplyr::filter(plotType=="distributed") %>%
   dplyr::group_by(domainID, siteID, eventID, samplingImpractical) %>%

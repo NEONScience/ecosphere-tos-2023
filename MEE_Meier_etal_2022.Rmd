@@ -2,7 +2,12 @@
 title: "MEE Worked Example: Meier et al. 2022"
 author: "Courtney L. Meier, Katherine M. Thibault, and David T. Barnett"
 date: "`r format(Sys.Date(), format = '%B %d, %Y')`"
-output: html_document
+output: 
+  html_document:
+    toc: true
+    toc_depth: 3
+    theme: united
+    highlight: tango
 ---
 
 ```{r setup, include=FALSE}
@@ -92,7 +97,7 @@ tempCDW <- cdw %>%
   dplyr::select(-uid, -coordinateUncertainty, -elevationUncertainty, -publicationDate)
 
 
-
+###-->  Could delete this since possible to identify collocation by simple plotID joining (done in code below) --------------------->
 ### Identify plotIDs in CDW dataset that are collocated with MAM sampling grids
 #   First, create MAM 'namedLocation' value for each CDW namedLocation value (e.g., 'HARV_001.mammalGrid.mam'); the goal is to
 #   check whether each CDW namedLocation has a collocated MAM namedLocation. The structure of the namedLocation value for any
@@ -112,12 +117,16 @@ tempCDW <- tempCDW %>%
 #   namedLocation is also a MAM namedLocation, the geoNEON::getLocByName() function will return a value from the NEON API;
 #   if a CDW namedLocation is not also a MAM namedLocation, the function does not return a value.
 #   Note: The 'data' argument must be a data.frame() and CANNOT be a tibble (the latter is commonly returned by dplyr).
-mamPlots <- geoNEON::getLocByName(
-  data = tempCDW,
-  locCol = "mamNamedLoc",
-  locOnly = TRUE,
-  token = Sys.getenv('NEON_PAT')
-)
+# mamPlots <- geoNEON::getLocByName(
+#   data = tempCDW,
+#   locCol = "mamNamedLoc",
+#   locOnly = TRUE,
+#   token = Sys.getenv('NEON_PAT')
+# )
+
+# saveRDS(mamPlots, file = "cdw_mam_collocation.RDS")
+
+mamPlots <- readRDS(file = "cdw_mam_collocation.RDS")
 
 #   Third, join tempCDW data with mamPlots and create a 'subtype' column to identify collocated sampling
 tempCDW <- tempCDW %>%
@@ -787,7 +796,7 @@ siteDF <- siteCdwVol %>%
 
 ### Create graphs of CDW and MAM data at plot and site spatial scales
 
-``` {r generateGraph-allPlots}
+``` {r generateGraph-allPlots, message=FALSE}
 ### Create graph of CDW volume vs. MAM maximum abundance across all plots and sites
 plotsGraph <- ggplot2::ggplot(
   data = plotDF,
@@ -812,10 +821,10 @@ plotsGraph
 ```
 
 - Across a selection of close-canopy forested NEON sites, measurements of CDW volume (m^3^/ha) and Small Mammal abundance (count/ha) reveal no clear correlation at the collocated plot-scale.
-- The Pearson's correlation coefficient is: `r cor(plotDF$cdwVol, plotDF$plotMaxAbundance)`.
+- The Pearson's correlation coefficient is: `r round(cor(plotDF$cdwVol, plotDF$plotMaxAbundance), digits = 2)`.
 
 
-``` {r generateGraph-allPlotsBySite}
+``` {r generateGraph-allPlotsBySite, message=FALSE}
 ### Create graph of CDW volume vs. MAM maximum abundance across plots within site
 sitePlotsGraph <- ggplot2::ggplot(
   data = plotDF,
@@ -831,7 +840,7 @@ sitePlotsGraph <- ggplot2::ggplot(
   ggplot2::geom_smooth(method = lm) +
   ggplot2::facet_wrap(
     facets = ~siteID,
-    ncol = 2,
+    ncol = 3,
     scales = "free"
   ) + 
   ggplot2::labs(
@@ -844,10 +853,10 @@ sitePlotsGraph
 
 ```
 
-- Within a selection of close-canopy forested NEON sites, CDW volume (m^3^/ha) and Small Mammal abundance (count/ha) show positive (RMNP, r~Pearson~ = `r cor(plotDF$cdwVol[plotDF$siteID=="RMNP"], plotDF$plotMaxAbundance[plotDF$siteID=="RMNP"])`), negative (ABBY, r~Pearson~ = `r cor(plotDF$cdwVol[plotDF$siteID=="ABBY"], plotDF$plotMaxAbundance[plotDF$siteID=="ABBY"])`), and weak correlation (HARV, JERC, STEI, UKFS).
+- Within a selection of close-canopy forested NEON sites, CDW volume (m^3^/ha) and Small Mammal abundance (count/ha) show positive (RMNP, r~Pearson~ = `r round(cor(plotDF$cdwVol[plotDF$siteID=="RMNP"], plotDF$plotMaxAbundance[plotDF$siteID=="RMNP"]), digits = 2)`), negative (ABBY, r~Pearson~ = `r round(cor(plotDF$cdwVol[plotDF$siteID=="ABBY"], plotDF$plotMaxAbundance[plotDF$siteID=="ABBY"]), digits = 2)`), and weak correlation (HARV, JERC, STEI, UKFS).
 
 
-``` {r generateGraph-allSites}
+``` {r generateGraph-allSites, message=FALSE}
 ### Create graph of CDW volume vs. MAM maximum abundance across sites
 sitesGraph <- ggplot2::ggplot(
   data = siteDF,
@@ -871,7 +880,7 @@ sitesGraph
 
 ```
 
-- Across a selection of closed-canopy forested NEON sites, CDW volume (m^3^/ha) and Small Mammal abundance (count/ha) show a weak, negative correlation at the site scale (r~Pearson~ = `r cor(siteDF$meanCdwVol, siteDF$siteMaxAbundance)`).
+- Across a selection of closed-canopy forested NEON sites, CDW volume (m^3^/ha) and Small Mammal abundance (count/ha) show a weak, negative correlation at the site scale (r~Pearson~ = `r round(cor(siteDF$meanCdwVol, siteDF$siteMaxAbundance), digits = 2)`).
 
 
 ## References

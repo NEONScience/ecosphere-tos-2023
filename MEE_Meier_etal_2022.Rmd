@@ -261,24 +261,24 @@ tempCDW <- tempCDW %>%
     key = paste(plotID, date, lidsAzimuth, individualID, sep = "_")
   )
 
-#   Identify duplicates ('dupes') based on 'key' value
-cdwDupesKey <- tempCDW %>%
+#   Identify duplicates ('dups') based on 'key' value
+cdwDupsKey <- tempCDW %>%
   dplyr::filter(duplicated(tempCDW$key)) %>%
   dplyr::select(key)
 
-cdwDupes <- tempCDW %>%
-  dplyr::filter(key %in% cdwDupesKey$key)
-#--> Log data assessment for dupes: only first one listed appears to be really a duplicate based on 
-#--> examination of other data fields; ABBY records are misindentified by the function as 'dupes' because transect was reflected (i.e., not
-#--> real duplicates).
+cdwDups <- tempCDW %>%
+  dplyr::filter(key %in% cdwDupsKey$key)
+# Log data assessment for dups: Only first one listed appears to be a real duplicate based on 
+# examination of other data fields; ABBY records are mis-indentified by the function as 'dups'
+# because transect was reflected (i.e., not real duplicates).
 
-#   Remove second instance of cdwDupes$key=="STEI_002_2016-05-26_320_NEON.CDW.D05.00375"
-cdwRemoveDupe <- cdwDupes %>%
+#   Remove second instance of cdwDups$key=="STEI_002_2016-05-26_320_NEON.CDW.D05.00375"
+cdwRemoveDup <- cdwDups %>%
   dplyr::distinct(key)
 
 tempCDW <- tempCDW %>%
-  dplyr::filter(!key %in% cdwRemoveDupe$key[1]) %>%
-  dplyr::bind_rows(cdwDupes[1,]) %>%
+  dplyr::filter(!key %in% cdwRemoveDup$key[1]) %>%
+  dplyr::bind_rows(cdwDups[1,]) %>%
   dplyr::arrange(domainID, siteID, plotID, lidsAzimuth, individualID)
 
 
@@ -465,7 +465,9 @@ mam_trapNight_nodups <- mam_trapNight_nodups %>%
 
 ## Analysis of Spatially Integrated Data Products at Plot and Site Scales
 
-In this section, we generate Coarse Downed Wood volume estimates and Small Mammal abundance estimates at both plot and site scales in order to demonstrate the spatial integration of NEON TOS data products.
+In this section, we generate Coarse Downed Wood volume estimates and Small Mammal abundance estimates at both plot and site scales in order to demonstrate the spatial integration of NEON TOS data products. Because CDW volume is generated every 5-years and does not change rapidly, barring fires or other site management activities, we compare with Small Mammal data collected the same year as the CDW data +/- 1 year. For example, for HARV CDW volume data collected in 2019, we compare to Small Mammal data collected from 2018-2020.
+
+Note: NEON publishes site management data via the 'Site management and event reporting' product (DP1.10111.001; https://data.neonscience.org/data-products/DP1.10111.001).
 
 
 ### Create Coarse Downed Wood Volume Datasets
@@ -564,11 +566,11 @@ DT::datatable(
 
 Here, we employ the minimum number known alive (MNKA) approach to estimate total small mammal abundance - e.g., as defined in Slade & Blair (2000). This approach assumes that a marked individual is present at all sampling points between its first and last capture dates, even if it was not actually captured in those interim trapping sessions. To make the dataset meet this assumption, we first add those implicit records to the dataset to make them explicit.
 
+Note that it is necessary to create Small Mammal `eventIDs` for legacy data collected prior to 2021. For the Small Mammal product, `eventIDs` correspond to discrete sampling bouts that represent a group of consecutive nights of trapping scheduled around a particular new moon. 
+
 ``` {r mamFinalizeDatasets, results='asis', message=FALSE}
 ### Create eventID grouping variable using mam_plotNight data and add to mam_trapNight data
-
-#   Prior to 2021, eventIDs were not created for MAM data. For records created in 2020 or earlier, 
-#   assign the same eventID to each record with an endDate no more than 10 days later than the previously
+#   Assign the same eventID to each record with an endDate no more than 10 days later than the previously
 #   created record.
 mam_plotNight_nodups <- mam_plotNight_nodups %>%
   dplyr::mutate(
@@ -868,8 +870,8 @@ plotsGraph <- ggplot2::ggplot(
   ggplot2::labs(
     x = "CDW Volume (m3/ha)",
     y = "Max Small Mammal Abundance (count/ha)",
-    title = "Correlation between CDW Volume and Max Small Mammal Abundance
-    at the plot scale across forested sites"
+    title = "Figure 1. Correlation between CDW Volume and Max Small Mammal Abundance
+    at the plot scale across forested sites."
   )
 
 plotsGraph
@@ -903,8 +905,8 @@ sitePlotsGraph <- ggplot2::ggplot(
   ggplot2::labs(
     x = "CDW Volume (m3/ha)",
     y = "Max Small Mammal Abundance (count/ha)",
-    title = "Correlation between CDW Volume and Max Small Mammal Abundance
-    by plot within site"
+    title = "Figure 2. Correlation between CDW Volume and Max Small Mammal Abundance
+    by plot within site."
   )
 
 sitePlotsGraph
@@ -932,7 +934,8 @@ sitesGraph <- ggplot2::ggplot(
   ggplot2::labs(
     x = "CDW Volume (m3/ha)",
     y = "Average Max Small Mammal Abundance (count/ha)",
-    title = "Correlation between CDW Volume and average max Small Mammal Abundance across sites"
+    title = "Figure 3. Correlation between CDW Volume and average max Small Mammal
+    Abundance across sites."
   )
 
 sitesGraph
@@ -960,3 +963,26 @@ Affleck, D.L.R. (2008) A line intersect distance sampling strategy for downed wo
 Affleck, D.L.R. (2010) On the efficiency of line intersect distance sampling. _Canadian Journal of Forest Research_, 40, 1086-1094.
 
 Slade, N.A. and Blair, S.M. (2000) An empirical test of using counts of individuals captured as indices of population size. _Journal of Mammalogy_, 81, 1035–1045.
+
+
+
+## Reproducibility
+
+Code was developed and tested using `R v4.1.2` and key packages with versions as shown below.
+
+``` {r reproducibility, echo=FALSE, message=FALSE}
+### Package data frame comes from local system used to develop code
+packages <- readRDS(file = "packageInfo.RDS")
+
+DT::datatable(
+  data = packages,
+  filter = "none",
+  rownames = FALSE,
+  caption = "Key package versions used to develop and test worked example code."
+)
+
+```
+
+
+
+

@@ -33,7 +33,7 @@ library(neonOS) #--> functions for basic quality checks, such as duplicate check
 
 ## Introduction
 
-The NEON Terrestrial Observation System (TOS) data products are frequently spatially integrated at multiple scales, from the site level to the level of relatively small 'sampling cells' that occur within plots (see Supporting Information file 1, Table 3). This worked example is a companion piece to our manuscript, _"Spatial and temporal sampling strategy connecting NEON Terrestrial Observation System protocols,"_ and the purpose is to illustrate how a user of NEON data can work with two TOS data products at different spatial scales in order to draw scientific insight. We focus on the 'Coarse downed wood log survey' data product (DP1.10010.001) and the 'Small mammal box trapping' data product (DP1.10072.001), and we show how to link data at both the plot and site spatial scales using R software (https://www.r-project.org/) to download data from the NEON API via the `neonUtilities` package (https://cran.r-project.org/web/packages/neonUtilities/). 
+The NEON Terrestrial Observation System (TOS) data products are frequently spatially integrated at multiple scales, from the site level to the level of relatively small 'sampling cells' that occur within plots (see Supporting Information file 1, Table 3). This worked example is a companion piece to our manuscript, _"Spatial and temporal sampling strategy connecting NEON Terrestrial Observation System protocols,"_ and the purpose is to illustrate how a user of NEON data can work with two TOS data products at different spatial scales to draw scientific insight. We focus on the 'Coarse downed wood log survey' data product (DP1.10010.001) and the 'Small mammal box trapping' data product (DP1.10072.001), and we show how to link data at both the plot and site spatial scales using R software (https://www.r-project.org/) to download data from the NEON API via the `neonUtilities` package (https://cran.r-project.org/web/packages/neonUtilities/). 
 
 
 ## Load data from the NEON Data Portal
@@ -42,7 +42,7 @@ Note: When retrieving data from the NEON API using the `neonUtilities` functions
 
 ### Load Coarse Downed Wood Tally Data
 
-At sites with sufficient logs >= 2 cm diameter, the 'Coarse downed wood log survey' data product, hereafter referred to as 'CDW Tally', is generated from both Distributed and Tower plots on a 5 year interval. However, sampling of Distributed and Tower plots is staggered through time such that each plot type is sampled every 2-3 years within a site. Distributed plots are allocated across each site in proportion to the area of dominant NLCD Vegetation Classes, and these plots allow creating statistically robust site-level estimates of both CDW volume (derived from tallies), and small mammal density. The Small Mammal (MAM) data product is generated annually from the majority of TOS sites, and MAM data are collected from grids that are collocated with Distributed base plots that also support CDW sampling. Because MAM grids are not collocated with Tower plots, the first tasks for this example are to identify which NEON sites have produced CDW Tally data, identify several forested sites with recent Distributed plot data for the example, and then identify which Distributed plotIDs are collocated with MAM sampling. 
+At sites with sufficient logs >= 2 cm diameter, the 'Coarse downed wood log survey' data product, hereafter referred to as 'CDW Tally', is generated from both Distributed and Tower plots on a 5 year interval. However, sampling of Distributed and Tower plots is staggered through time such that each plot type is sampled every 2-3 years within a site. Distributed plots are allocated across each site in proportion to the area of dominant National Land Cover Database (NLCD) Vegetation Classes, and these plots allow creating statistically robust site-level estimates of both CDW volume (derived from tallies) and small mammal density. The Small Mammal (MAM) data product is generated annually from most TOS sites, and MAM data are collected from grids that are typically collocated with Distributed base plots, but not Tower plots, which also support CDW sampling. Thus, the first tasks for this example are to identify which NEON sites have produced CDW Tally data, identify several forested sites with recent Distributed plot data for the example, and then identify which Distributed plotIDs are collocated with MAM sampling. 
 
 The NEON 'Coarse downed wood log survey' data product citation is:
 
@@ -145,19 +145,17 @@ tempCDW <- tempCDW %>%
   ) %>%
   dplyr::select(-mamNamedLoc)
 
-#   Rather than programmatically retrieving TOS Spatial Data via the API with the `geoNEON` functions,
+#   As an aside, rather than programmatically retrieving TOS Spatial Data via the API with the `geoNEON` functions,
 #   these data may also be manually downloaded: https://data.neonscience.org/documents (then click on
 #   'Spatial Data' and click on 'All_NEON_TOS_Plots_VX' link to retrieve zip that contains a .csv with
-#   plot data).
-
-# tosPlots <- read.csv(file = "All_NEON_TOS_Plot_Centroids_V8.csv", header = TRUE)
+#   plot data). If this approached were used, you could then read in the included .csv - e.g., tosPlots <- read.csv(file = "All_NEON_TOS_Plot_Centroids_V8.csv", header = TRUE)
 
 ```
 
 
 ### Load Small Mammal Data
 
-Small Mammal sampling grids (n=3 to n=6 per site) are collocated with Distributed base plots that support multiple TOS protocols (including Coarse Downed Wood), and grids are sampled one to several times per year. Similar to Distributed base plots, mammal grids are allocated using a stratified random design informed by NLCD Vegetation Class.
+Small Mammal sampling grids (n=3 to n=8 per site) are collocated with Distributed base plots that support multiple TOS protocols (including Coarse Downed Wood), and grids are sampled one to several times per year (ideally, 4-6 times per year). Similar to Distributed base plots, mammal grids are allocated using a stratified random design informed by NLCD Vegetation Class.
 
 The NEON 'Small mammal box trapping' data product citation is:
 
@@ -188,7 +186,6 @@ mamDP <- readRDS(file = "mam_allTables_2016-2021.RDS")
 list2env(mamDP, envir=.GlobalEnv)
 
 
-
 ### Read in master SMALL_MAMMAL taxon table via the NEON API
 #   https://www.neonscience.org/resources/learning-hub/tutorials/neon-api-usage
 #   using the verbose option to get the taxonProtocolCategory field
@@ -207,7 +204,7 @@ mam.list <- jsonlite::fromJSON(httr::content(mam.req, as="text"))
 For CDW tally data, prior to analysis it is important to:
 - Check for duplicates, and
 - Remove any tallied logs with a `logDistance` greater than the protocol-specified transect length, and
-- Verify that all tallied logs meet LIDS 'limiting distance' tally criteria based on reported `equivalentLogDiameter`, `logDistance`, and `volumeFactor` data. The `equivalentLogDiameter` is used so that round and elliptical logs (typically highly decayed) can be assessed with the same criteria. Logs with `logDistance` greater than the limiting distance are removed from the dataset. Because technicians sometimes use tables to determine limiting distance, rather than digital data ingest devices, and tables require rounding, it is expected that some logs will have `logDistance` greater than the calculated limiting distance and will be removed. See Affleck (2010) for details.
+- Verify that all tallied logs meet 'limiting distance (LIDS)' tally criteria based on reported `equivalentLogDiameter`, `logDistance`, and `volumeFactor` data. The `equivalentLogDiameter` is used so that round and elliptical logs (typically highly decayed) can be assessed with the same criteria. Logs with `logDistance` greater than the limiting distance are removed from the dataset. Because technicians sometimes use tables to determine limiting distance, rather than digital data ingest devices, and tables require rounding, it is expected that some logs will have `logDistance` greater than the calculated limiting distance and will be removed. See Affleck (2010) for details.
 
 
 ``` {r cdwDataQC, results=FALSE, message=FALSE}
@@ -227,7 +224,7 @@ tempCDW <- tempCDW %>%
     key = paste(plotID, date, lidsAzimuth, individualID, sep = "_")
   )
 
-#   Identify duplicates based on 'key' value
+#   Identify duplicates ('dupes') based on 'key' value
 cdwDupesKey <- tempCDW %>%
   dplyr::filter(duplicated(tempCDW$key)) %>%
   dplyr::select(key)
@@ -235,8 +232,8 @@ cdwDupesKey <- tempCDW %>%
 cdwDupes <- tempCDW %>%
   dplyr::filter(key %in% cdwDupesKey$key)
 #--> Log data assessment for dupes: only first one listed appears to be really a duplicate based on 
-#--> examination of other data fields; ABBY records are 'dupes' because transect was reflected, so not
-#--> real duplicates.
+#--> examination of other data fields; ABBY records are misindentified by the function as 'dupes' because transect was reflected (i.e., not
+#--> real duplicates).
 
 #   Remove second instance of cdwDupes$key=="STEI_002_2016-05-26_320_NEON.CDW.D05.00375"
 cdwRemoveDupe <- cdwDupes %>%
@@ -246,7 +243,6 @@ tempCDW <- tempCDW %>%
   dplyr::filter(!key %in% cdwRemoveDupe$key[1]) %>%
   dplyr::bind_rows(cdwDupes[1,]) %>%
   dplyr::arrange(domainID, siteID, plotID, lidsAzimuth, individualID)
-
 
 
 ### Perform QC checks for volumeFactor, logDistance, and equivalentLogDiameter
@@ -273,7 +269,8 @@ fCheck <- tempCDW %>%
   dplyr::filter(fValQF==1) %>%
   dplyr::select(domainID, siteID, volumeFactor, fValue, fValQF)
 #--> volumeFactor data entry problems for HARV and STEI; volumeFactor is assigned at the site level and
-#--> should not vary from plot-to-plot. Likely a data entry error.
+#--> should not vary from plot-to-plot. Likely a data entry error. As an aside, we encourage users to let NEON
+#--> staff know about issues they discover like this one: (https://www.neonscience.org/about/contact-us).
 
 #   Correct volumeFactor data for HARV, STEI sites based on fCheck results
 tempCDW <- tempCDW %>%
@@ -285,7 +282,6 @@ tempCDW <- tempCDW %>%
       TRUE ~ volumeFactor
     )
   )
-
 
 
 ### Tally QC checks: Verify that logs in the dataset should be tallied based on protocol criteria
@@ -300,7 +296,7 @@ tempCDW <- tempCDW %>%
   ) 
 
 
-##  Check whether logDistance is <= limitingDistance (it should be) based on equivalentLogDiameter, and flag
+##  Check whether logDistance is <= limitingDistance, as expected, based on equivalentLogDiameter, and flag
 #   Use formula to calculate limiting distance from Affleck 2010, Appendix A:
 #   limitingDist = ((pi^2)*(roundDiameter^2))/(8*transectNum*fValue), where
 #   roundDiameter = round diameter of the log (cm), taken from the equivalentLogDiameter field in NEON data
@@ -356,8 +352,8 @@ temp <- mam_pertrapnight %>%
     plotID %in% mam_perplotnight$plotID[problems] & collectDate %in% mam_perplotnight$collectDate[problems]
   )
 #--> Since the remaining fields were populated and there are captures for each, these records appear to 
-#--> represent a valid night of trapping. So, assign custom temporary nightuids in both tables and let NEON
-#--> staff know about the issue: (https://www.neonscience.org/about/contact-us).
+#--> represent a valid night of trapping. So, we will assign custom temporary nightuids in both tables here. As an aside, we encourage users to let NEON
+#--> staff know about issues they discover like this one: (https://www.neonscience.org/about/contact-us).
 
 #   Create custom nightuids for duplicates identified above that are missing primary key value
 mam_perplotnight_adj <- mam_perplotnight %>%
@@ -373,7 +369,6 @@ mam_plotNight_nodups <- neonOS::removeDups(
   table = "mam_perplotnight"
 )
 #--> No duplicate key values found
-
 
 
 ### Second, check the mam_pertrapnight table by nightuid and trapcoordinate using the standard 
@@ -438,7 +433,7 @@ Using the LIDS method (Affleck 2008, 2010), CDW volume is calculated at the plot
 
 `CDW volume density = F * n` (m^3^/hectare); 
 
-where `F` is the site-specific volume factor, and `n` is the number of qualifying logs tallied across all three transects originating from the centroid of the plot. Importantly, at the plot scale, CDW volume density is collocated with Small Mammal abundance data at a maximum of n=6 plots per site.
+where `F` is the site-specific volume factor, and `n` is the number of qualifying logs tallied across all three transects originating from the centroid of the plot. Importantly, at the plot scale, CDW volume density is collocated with Small Mammal abundance data at a maximum of n=6 plots per site (for theSites included).
 
 At the site scale, mean CDW volume (m^3^/hectare) is simply the mean of the plot scale values; the mean site-scale parameter is robust because of the spatially-balanced, stratified-random nature of the TOS Spatial Design. When comparing CDW volume and Small Mammal abundance at the site scale, CDW data from all Distributed plots are used for the calculation.
 
@@ -496,7 +491,6 @@ DT::datatable(
 )
 
 
-
 ### Calculate CDW Volume for each siteID in the cleaned dataset and display
 #   Calculate site-level mean CDW volume
 siteCdwVol <- plotCdwVol %>%
@@ -527,7 +521,7 @@ DT::datatable(
 
 ### Create Small Mammal Density datasets
 
-Here, we employ the minimum number known alive (MNKA) approach to estimate total small mammal abundance - e.g., as defined in Slade & Blair (2000). This approach assumes that a marked individual is present at all sampling points between its first and last capture dates, even if it wasn't actually captured in those interim trapping sessions. To make the dataset meet this assumption, we first add those implicit records to the dataset to make them explicit.
+Here, we employ the minimum number known alive (MNKA) approach to estimate total small mammal abundance - e.g., as defined in Slade & Blair (2000). This approach assumes that a marked individual is present at all sampling points between its first and last capture dates, even if it was not actually captured in those interim trapping sessions. To make the dataset meet this assumption, we first add those implicit records to the dataset to make them explicit.
 
 ``` {r mamFinalizeDatasets, results='asis', message=FALSE}
 ### Create eventID grouping variable using mam_plotNight data and add to mam_trapNight data
@@ -568,7 +562,6 @@ mam_trapNight_nodups <- mam_trapNight_nodups %>%
       dplyr::select(nightuid, eventID),
     by = "nightuid"
   )
-
 
 
 ### Create and finalize Small Mammal capture dataset for selected sites
@@ -690,7 +683,7 @@ mnka_per_plot_per_bout <- function(capture_data, plotsOI) {
 
 ```
 
-We now utilize the MNKA small mammal density function to calculate MNKA at the plot scale and site scale in order to compare to CDW volume density data calculated above. Because CDW volume does not change rapidly, and small mammal abundance may change substantially both within and among years, here we generate the maximum small mammal abundance for a given plot for a three-year window centered on the year that logs were tallied for CDW.
+We now use the MNKA small mammal density function to calculate MNKA at the plot scale and site scale in order to compare to CDW volume density data calculated above. Because CDW volume does not change rapidly, and small mammal abundance may change substantially both within and among years, here we generate the maximum small mammal abundance for a given plot for a three-year window centered on the year that logs were tallied for CDW.
 
 ``` {r mamMnkaEstimates, message=FALSE}
 ### Calculate MNKA per plot per bout for all data in processed capsNew dataset and select 3-year window of
@@ -755,7 +748,6 @@ DT::datatable(
 )
 
 
-
 ### Calculate MNKA metrics per site based on plot-level data
 siteMNKA <- plotMNKA %>%
   dplyr::group_by(siteID) %>%
@@ -801,7 +793,6 @@ plotDF <- plotCdwVol %>%
   dplyr::filter(
     !is.na(plotMaxAbundance)
   )
-
 
 
 ### Join site-level CDW and MAM datasets

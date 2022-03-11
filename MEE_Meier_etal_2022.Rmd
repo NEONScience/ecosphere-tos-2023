@@ -10,30 +10,64 @@ output:
     highlight: tango
 ---
 
-```{r setup, include=FALSE}
+```{r setup, include=FALSE, message=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 
-##  Load required CRAN libraries
-library(devtools) #--> Load packages from Github not available on CRAN
-library(data.table)
-library(DT) #--> Data Table display tools for html output
-library(glue)
-library(neonUtilities) #--> Tools to retrieve data from the NEON Portal
-library(plotly)
-library(tidyverse)
+##  Load required CRAN packages
+#   Define list of needed CRAN packages
+cranPackages <- c(
+  "devtools", # Load packages from Github not available on CRAN
+  "data.table",
+  "DT", # Data Table display tools for html output
+  "neonUtilities", # Tools to retrieve data from the NEON Portal
+  "tidyverse"
+)
 
-##  Install packages from Github
-# devtools::install_github('NEONScience/NEON-geolocation/geoNEON', dependencies = TRUE)
-library(geoNEON) #--> Required to programmatically access TOS Spatial Data
-# devtools::install_github('NEONScience/NEON-OS-data-processing/neonOS', dependencies = TRUE)
-library(neonOS) #--> functions for basic quality checks, such as duplicate checks
+#   Load packages if installed, install and load if not installed
+sapply(
+  cranPackages,
+  FUN = function(x) {
+    if (x %in% installed.packages()) {
+      library(x, character.only = TRUE)
+    } else {
+      install.packages(x, dependencies = TRUE)
+      library(x, character.only = TRUE)
+    }
+  }
+)
+
+
+##  Load required packages from Github
+#   Define list of needed Github packages
+gitPackages <- c(
+  "geoNEON", # Required to programmatically access TOS Spatial Data
+  "neonOS" # Functions for basic quality checks of NEON Observation System data; e.g., duplicate checks
+)
+
+#   Load packages if installed, install from Git and load if not installed
+sapply(
+  gitPackages,
+  FUN = function(x) {
+    if (x %in% installed.packages()) {
+      library(x, character.only = TRUE)
+    } else if (x=="geoNEON") {
+      devtools::install_github('NEONScience/NEON-geolocation/geoNEON', dependencies = TRUE)
+      library(x, character.only = TRUE)
+    } else if (x=="neonOS") {
+      devtools::install_github('NEONScience/NEON-OS-data-processing/neonOS', dependencies = TRUE)
+      library(x, character.only = TRUE)
+    }
+  }
+)
 
 ```
 
 
 ## Introduction
 
-The NEON Terrestrial Observation System (TOS) data products are frequently spatially integrated at multiple scales, from the site level to the level of relatively small 'sampling cells' that occur within plots (see Supporting Information file 1, Table 3). This worked example is a companion piece to our manuscript, _"Spatial and temporal sampling strategy connecting NEON Terrestrial Observation System protocols,"_ and the purpose is to illustrate how a user of NEON data can work with two TOS data products at different spatial scales to draw scientific insight. We focus on the 'Coarse downed wood log survey' data product (DP1.10010.001) and the 'Small mammal box trapping' data product (DP1.10072.001), and we show how to link data at both the plot and site spatial scales using R software (https://www.r-project.org/) to download data from the NEON API via the `neonUtilities` package (https://cran.r-project.org/web/packages/neonUtilities/). 
+The NEON Terrestrial Observation System (TOS) data products are frequently spatially integrated at multiple scales, from the site level to the level of relatively small 'sampling cells' that occur within plots (see Supporting Information File 1, Table 3). In addition, the frequency with which TOS data products are generated at each site varies widely, from multiple bouts per year to once every 5 years. This worked example is a companion piece to our manuscript, _"Spatial and temporal sampling strategy connecting NEON Terrestrial Observation System protocols,"_ and the purpose is to illustrate how a user of NEON data can draw scientific insight by working with two TOS data products collected at different spatial scales and at different temporal frequencies. 
+
+Here, we focus on the 'Coarse downed wood log survey' data product (DP1.10010.001; generated every 5-years) and the 'Small mammal box trapping' data product (DP1.10072.001; generated multiple times per year). Using R software (https://www.r-project.org/) to download data from the NEON API via the `neonUtilities` package (https://cran.r-project.org/web/packages/neonUtilities/), we show how to link data at both the plot and site spatial scales via the `plotID`. We also develop one method for comparing TOS data across products generated with very different temporal frequencies. For this example, we chose to investigate correlations between 'Coarse downed wood log survey' data and 'Small mammal box trapping' data based on the hypothesis that coarse downed wood (CDW) provides habitat for small mammals in forested systems, and increasing CDW volume may therefore be correlated with increasing small mammal abundance, both within and among sites.
 
 
 ## Load data from the NEON Data Portal
@@ -81,9 +115,7 @@ summaryDist <- cdw %>%
     plotCount = length(unique(plotID))
   )
 
-#   Selected sites are all predominantly forested; note that RMNP has different F-values and transect
-#   lengths for Distributed and Tower plots due to distant parcels of land used for each plot type 
-#   and different forest types.
+#   From 'summaryDist' output, select 6 sites with closed-canopy forest
 theSites <- c("HARV","JERC","STEI","UKFS","RMNP","ABBY")
 
 #   Filter CDW data to selected sites, filter to most recent eventID, remove unneeded columns
@@ -201,10 +233,15 @@ mam.list <- jsonlite::fromJSON(httr::content(mam.req, as="text"))
 
 ### Coarse Downed Wood Tally QC Checks
 
+Note: The word `'log'` is used frequently in the Coarse Downed Wood dataset, and refers to a downed piece of wood, not a logarithm.
+
 For CDW tally data, prior to analysis it is important to:
+
 - Check for duplicates, and
 - Remove any tallied logs with a `logDistance` greater than the protocol-specified transect length, and
-- Verify that all tallied logs meet 'limiting distance (LIDS)' tally criteria based on reported `equivalentLogDiameter`, `logDistance`, and `volumeFactor` data. The `equivalentLogDiameter` is used so that round and elliptical logs (typically highly decayed) can be assessed with the same criteria. Logs with `logDistance` greater than the limiting distance are removed from the dataset. Because technicians sometimes use tables to determine limiting distance, rather than digital data ingest devices, and tables require rounding, it is expected that some logs will have `logDistance` greater than the calculated limiting distance and will be removed. See Affleck (2010) for details.
+- Verify that all tallied logs meet 'limiting distance' tally criteria based on reported `equivalentLogDiameter`, `logDistance`, and `volumeFactor` data (see Affleck 2010 for details). 
+    - The `equivalentLogDiameter` is used so that round and elliptical logs (typically highly decayed) can be assessed with the same criteria. Logs with `logDistance` greater than the limiting distance are removed from the dataset. 
+    - Because technicians sometimes use look-up tables to determine limiting distance from a subset of `equivalentLogDiameter` values (e.g., when digital ingest devices fail), and look-up tables require choosing the nearest `equivalentLogDiameter` rather than using the actual measured value, it is expected that some logs will have `logDistance` greater than the calculated limiting distance and will be removed.
 
 
 ``` {r cdwDataQC, results=FALSE, message=FALSE}
@@ -247,7 +284,10 @@ tempCDW <- tempCDW %>%
 
 ### Perform QC checks for volumeFactor, logDistance, and equivalentLogDiameter
 ##  Volume Factor: Check value matches protocol and flag if no match
-#   Read in CDW volumeFactor and transectLength look-up table derived from protocol (NEON.DOC.001711)
+#   Read in CDW volumeFactor and transectLength look-up table derived from protocol (NEON.DOC.001711).
+#   Note that RMNP has different F-values and transect lengths for Distributed and Tower plots due
+#   to distant parcels of land used for each plot type and different forest types. The RMNP values in
+#   this table are specific to Distributed plots since we wish to compare data with Small Mammal data.
 cdwParam <- read.csv(file = "cdw_siteParamLookup.csv", header = TRUE)
 
 #   Join look-up table values with CDW data and flag records with incorrect volume factor (i.e., f-value)
@@ -268,9 +308,10 @@ tempCDW <- tempCDW %>%
 fCheck <- tempCDW %>%
   dplyr::filter(fValQF==1) %>%
   dplyr::select(domainID, siteID, volumeFactor, fValue, fValQF)
-#--> volumeFactor data entry problems for HARV and STEI; volumeFactor is assigned at the site level and
-#--> should not vary from plot-to-plot. Likely a data entry error. As an aside, we encourage users to let NEON
-#--> staff know about issues they discover like this one: (https://www.neonscience.org/about/contact-us).
+#   volumeFactor problems identified for HARV and STEI; volumeFactor is supposed to be assigned
+#   at the site level and should not vary from plot-to-plot. The variation in the data likely
+#   reflects a data entry error. We encourage data users to let NEON staff know about issues 
+#   they discover like this one: https://www.neonscience.org/about/contact-us
 
 #   Correct volumeFactor data for HARV, STEI sites based on fCheck results
 tempCDW <- tempCDW %>%
@@ -827,7 +868,8 @@ plotsGraph <- ggplot2::ggplot(
   ggplot2::labs(
     x = "CDW Volume (m3/ha)",
     y = "Max Small Mammal Abundance (count/ha)",
-    title = "Correlation between CDW Volume and Max Small Mammal Abundance at the plot scale across forested sites"
+    title = "Correlation between CDW Volume and Max Small Mammal Abundance
+    at the plot scale across forested sites"
   )
 
 plotsGraph
@@ -861,7 +903,8 @@ sitePlotsGraph <- ggplot2::ggplot(
   ggplot2::labs(
     x = "CDW Volume (m3/ha)",
     y = "Max Small Mammal Abundance (count/ha)",
-    title = "Correlation between CDW Volume and Max Small Mammal Abundance by plot within site"
+    title = "Correlation between CDW Volume and Max Small Mammal Abundance
+    by plot within site"
   )
 
 sitePlotsGraph

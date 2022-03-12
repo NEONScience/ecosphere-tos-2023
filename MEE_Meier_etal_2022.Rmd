@@ -177,12 +177,14 @@ tempCDW <- tempCDW %>%
   ) %>%
   dplyr::select(-mamNamedLoc)
 
-#   As an aside, rather than programmatically retrieving TOS Spatial Data via the API with the `geoNEON` functions,
-#   these data may also be manually downloaded: https://data.neonscience.org/documents (then click on
-#   'Spatial Data' and click on 'All_NEON_TOS_Plots_VX' link to retrieve zip that contains a .csv with
-#   plot data). If this approached were used, you could then read in the included .csv - e.g., tosPlots <- read.csv(file = "All_NEON_TOS_Plot_Centroids_V8.csv", header = TRUE)
-
 ```
+
+As an aside, rather than programmatically retrieving TOS Spatial Data via the API with the `geoNEON` functions, as is done in the code chunk above, these spatial data may also be manually downloaded:
+
+- First, navigate to https://data.neonscience.org/documents
+- Click on 'Spatial Data' and click on the 'All_NEON_TOS_Plots_VX' link to retrieve a zip that contains a .csv with plot data.
+- If this approached is used, one can then read in the included .csv file.
+    - For example: `tosPlots <- read.csv(file = "All_NEON_TOS_Plot_Centroids_V8.csv", header = TRUE)`
 
 
 ### Load Small Mammal Data
@@ -221,7 +223,9 @@ list2env(mamDP, envir=.GlobalEnv)
 ### Read in master SMALL_MAMMAL taxon table via the NEON API
 #   https://www.neonscience.org/resources/learning-hub/tutorials/neon-api-usage
 #   using the verbose option to get the taxonProtocolCategory field
-mam.req <- httr::GET("https://data.neonscience.org/api/v0/taxonomy/?taxonTypeCode=SMALL_MAMMAL&verbose=true&offset=0&limit=1000")
+mam.req <- httr::GET(
+  "https://data.neonscience.org/api/v0/taxonomy/?taxonTypeCode=SMALL_MAMMAL&verbose=true&offset=0&limit=1000"
+)
 mam.list <- jsonlite::fromJSON(httr::content(mam.req, as="text"))
 
 
@@ -379,8 +383,8 @@ mam_plotNight_nodups <- neonOS::removeDups(
   variables = variables_10072,
   table = "mam_perplotnight"
 )
-#--> Running this check generated the message: Primary key fields contain NA values and/or empty strings.
-#--> Results may be unreliable; check input data carefully. - followed by an error message
+# Running this check generated the message: Primary key fields contain NA values and/or empty strings.
+# Results may be unreliable; check input data carefully. - followed by an error message
 
 
 ##  To troubleshoot, first query the table to find the problematic records
@@ -392,9 +396,10 @@ temp <- mam_pertrapnight %>%
   dplyr::filter(
     plotID %in% mam_perplotnight$plotID[problems] & collectDate %in% mam_perplotnight$collectDate[problems]
   )
-#--> Since the remaining fields were populated and there are captures for each, these records appear to 
-#--> represent a valid night of trapping. So, we will assign custom temporary nightuids in both tables here. As an aside, we encourage users to let NEON
-#--> staff know about issues they discover like this one: (https://www.neonscience.org/about/contact-us).
+# Since the remaining fields were populated and there are captures for each, these records appear to 
+# represent a valid night of trapping. So, we will assign custom temporary nightuids in both tables here.
+# As an aside, we encourage users to let NEON staff know about issues they discover like this one: 
+# (https://www.neonscience.org/about/contact-us).
 
 #   Create custom nightuids for duplicates identified above that are missing primary key value
 mam_perplotnight_adj <- mam_perplotnight %>%
@@ -409,7 +414,7 @@ mam_plotNight_nodups <- neonOS::removeDups(
   variables = variables_10072,
   table = "mam_perplotnight"
 )
-#--> No duplicate key values found
+# No duplicate key values found
 
 
 ### Second, check the mam_pertrapnight table by nightuid and trapcoordinate using the standard 
@@ -434,7 +439,7 @@ mam_trapNight_nodups <- neonOS::removeDups(
   variables = variables_10072,
   table = "mam_pertrapnight"
 ) 
-#-->  Output: 2 unresolveable duplicates flagged with duplicateRecordQF=2
+# Output: Two unresolveable duplicates flagged with duplicateRecordQF=2
 
 
 ##  Follow-up trouble-shooting to deal with unresolveable duplicates
@@ -442,15 +447,15 @@ mam_trapNight_nodups <- neonOS::removeDups(
 
 which(is.na(mam_pertrapnight_adj$nightuid)) #--> yields 0 
 which(is.na(mam_pertrapnight_adj$trapCoordinate)) #--> yields 0
-#--> Two lines above mean that trapID and individualCode are the source of the NAs, which is expected
-#--> based on the protocol.
+# Two lines above mean that trapID and individualCode are the source of the NAs, which is expected
+# based on the protocol.
 
 #   Next, check that the unresolved duplicates will not impact the intended analyses
 dupCheck <- mam_trapNight_nodups %>% 
   dplyr::filter(
     duplicateRecordQF == 2 & trapStatus != "4 - more than 1 capture in one trap"
   )
-#--> No records in the set, so these unresolved duplicates will not impact the intended analyses
+# No records in the set, so these unresolved duplicates will not impact the intended analyses
 
 
 ##  Add multiple capture records back to dataset
@@ -485,8 +490,8 @@ At the site scale, mean CDW volume (m^3^/hectare) is simply the mean of the plot
 #   First, focus on plots with targetTaxaPresent=="Y" --> i.e., at least one qualifying log was tallied
 #   within the plot
 plotCdwVol <- filterCDW %>%
-  dplyr::filter(is.na(samplingImpractical) | samplingImpractical=="OK") %>% #--> Remove SamplingImpractical!="OK"
-  dplyr::filter(targetTaxaPresent=="Y") %>% #--> Remove records for transects with no logs
+  dplyr::filter(is.na(samplingImpractical) | samplingImpractical=="OK") %>% # Remove SamplingImpractical!="OK"
+  dplyr::filter(targetTaxaPresent=="Y") %>% # Remove records for transects with no logs
   dplyr::group_by(domainID, siteID, volumeFactor, eventID, plotID) %>%
   dplyr::summarise(
     logCount = n()
@@ -498,7 +503,7 @@ noLogs <- filterCDW %>%
   dplyr::filter(targetTaxaPresent=="N") %>%
   dplyr::group_by(domainID, siteID, volumeFactor, eventID, plotID) %>%
   dplyr::summarise(
-    transectCount = n() #--> Identify plots with all 3 transects with ttP=="N"
+    transectCount = n() # Identify plots with all 3 transects with ttP=="N"
   ) %>%
   dplyr::filter(transectCount==3) %>%
   dplyr::mutate(
@@ -596,7 +601,7 @@ mam_plotNight_nodups <- mam_plotNight_nodups %>%
   ) %>%
   dplyr::ungroup() %>%
   dplyr::select(-priorEndDate, -diffDays, -boutIncrement, -boutNum)
-#--> Above, shift() defaults to type = "lag", which returns the previous row value for the specified column
+# Above, shift() defaults to type = "lag", which returns the previous row value for the specified column
 
 #   Add nightuid and eventID from mam_plotNight_nodups to mam_trapNight_nodups
 mam_trapNight_nodups <- mam_trapNight_nodups %>%
@@ -722,7 +727,7 @@ mnka_per_plot_per_bout <- function(capture_data, plotsOI) {
   
   return(mnka_by_plot_bout)
 }
-#--> Output is MNKA (count/hectare), based on 1 ha size of trapping grid
+# Output is MNKA (count/hectare), based on 1 ha size of trapping grid
 
 ```
 
@@ -870,8 +875,8 @@ plotsGraph <- ggplot2::ggplot(
   ggplot2::labs(
     x = "CDW Volume (m3/ha)",
     y = "Max Small Mammal Abundance (count/ha)",
-    title = "Figure 1. Correlation between CDW Volume and Max Small Mammal Abundance
-    at the plot scale across forested sites."
+    title = "Figure 1. Correlation between CDW Volume and Max Small Mammal
+    Abundance at the plot scale across forested sites."
   )
 
 plotsGraph
@@ -905,8 +910,8 @@ sitePlotsGraph <- ggplot2::ggplot(
   ggplot2::labs(
     x = "CDW Volume (m3/ha)",
     y = "Max Small Mammal Abundance (count/ha)",
-    title = "Figure 2. Correlation between CDW Volume and Max Small Mammal Abundance
-    by plot within site."
+    title = "Figure 2. Correlation between CDW Volume and Max Small Mammal
+    Abundance by plot within site."
   )
 
 sitePlotsGraph
@@ -968,7 +973,7 @@ Slade, N.A. and Blair, S.M. (2000) An empirical test of using counts of individu
 
 ## Reproducibility
 
-Code was developed and tested using `R v4.1.2` and key packages with versions as shown below.
+Code was developed and tested using `R v4.1.2`, and key packages with versions as shown below. Worked example code may generate errors if key package versions are earlier than those indicated.
 
 ``` {r reproducibility, echo=FALSE, message=FALSE}
 ### Package data frame comes from local system used to develop code

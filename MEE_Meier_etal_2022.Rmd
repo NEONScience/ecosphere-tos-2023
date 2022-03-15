@@ -76,7 +76,7 @@ Note: When retrieving data from the NEON API using the `neonUtilities` functions
 
 ### Load Coarse Downed Wood Tally Data
 
-At sites with sufficient logs >= 2 cm diameter, the 'Coarse downed wood log survey' data product, hereafter referred to as 'CDW Tally', is generated from both Distributed and Tower plots on a 5 year interval. However, sampling of Distributed and Tower plots is staggered through time such that each plot type is sampled every 2-3 years within a site. Distributed plots are allocated across each site in proportion to the area of dominant National Land Cover Database (NLCD) Vegetation Classes, and these plots allow creating statistically robust site-level estimates of both CDW volume (derived from tallies) and small mammal density. The Small Mammal (MAM) data product is generated annually from most TOS sites, and MAM data are collected from grids that are typically collocated with Distributed base plots, but not Tower plots, which also support CDW sampling. Thus, the first tasks for this example are to identify which NEON sites have produced CDW Tally data, identify several forested sites with recent Distributed plot data for the example, and then identify which Distributed plotIDs are collocated with MAM sampling. 
+At sites with sufficient logs >= 2 cm diameter, the 'Coarse downed wood log survey' data product, hereafter referred to as 'CDW Tally', is generated from both Distributed and Tower plots on a 5 year interval. However, sampling of Distributed and Tower plots is staggered through time such that each plot type is sampled every 2-3 years within a site. Distributed plots are allocated across each site in proportion to the area of dominant National Land Cover Database (NLCD) Vegetation Classes, and these plots allow creating statistically robust site-level estimates of both CDW volume (derived from tallies) and small mammal density. The Small Mammal (MAM) data product is generated annually from most TOS sites, and MAM data are collected from grids that are typically colocated with Distributed base plots, but not Tower plots, which also support CDW sampling. Thus, the first tasks for this example are to identify which NEON sites have produced CDW Tally data, identify several forested sites with recent Distributed plot data for the example, and then identify which Distributed plotIDs are colocated with MAM sampling. 
 
 The NEON 'Coarse downed wood log survey' data product citation is:
 
@@ -134,9 +134,9 @@ tempCDW <- cdw %>%
 
 
 
-### Identify plotIDs in CDW dataset that are collocated with MAM sampling grids
+### Identify plotIDs in CDW dataset that are colocated with MAM sampling grids
 #   First, create MAM 'namedLocation' value for each CDW namedLocation value (e.g., 'HARV_001.mammalGrid.mam');
-#   the goal is to check whether each CDW namedLocation has a collocated MAM namedLocation. The structure
+#   the goal is to check whether each CDW namedLocation has a colocated MAM namedLocation. The structure
 #   of the namedLocation value for any NEON data product can be determined by downloading data and 
 #   checking the namedLocation field.
 
@@ -168,7 +168,7 @@ tempCDW <- tempCDW %>%
 
 mamPlots <- readRDS(file = "cdw_mam_collocation.RDS")
 
-#   Third, join tempCDW data with mamPlots and create a 'subtype' column to identify collocated sampling
+#   Third, join tempCDW data with mamPlots and create a 'subtype' column to identify colocated sampling
 tempCDW <- tempCDW %>%
   dplyr::left_join(
     mamPlots %>% 
@@ -189,7 +189,7 @@ As an aside, rather than programmatically retrieving TOS Spatial Data via the AP
 
 ### Load Small Mammal Data
 
-Small Mammal sampling grids (n=3 to n=8 per site) are collocated with Distributed base plots that support multiple TOS protocols (including Coarse Downed Wood), and grids are sampled one to several times per year (ideally, 4-6 times per year). Similar to Distributed base plots, mammal grids are allocated using a stratified random design informed by NLCD Vegetation Class.
+Small Mammal sampling grids (n=3 to n=8 per site) are colocated with Distributed base plots that support multiple TOS protocols (including Coarse Downed Wood), and grids are sampled one to several times per year (ideally, 4-6 times per year). Similar to Distributed base plots, mammal grids are allocated using a stratified random design informed by NLCD Vegetation Class.
 
 The NEON 'Small mammal box trapping' data product citation is:
 
@@ -481,7 +481,7 @@ Using the LIDS method (Affleck 2008, 2010), CDW volume is calculated at the plot
 
 `CDW volume density = F * n` (m^3^/hectare); 
 
-where `F` is the site-specific volume factor, and `n` is the number of qualifying logs tallied across all three transects originating from the centroid of the plot. Importantly, at the plot scale, CDW volume density is collocated with Small Mammal abundance data at a maximum of n=6 plots per site (for theSites included).
+where `F` is the site-specific volume factor, and `n` is the number of qualifying logs tallied across all three transects originating from the centroid of the plot. Importantly, at the plot scale, CDW volume density is colocated with Small Mammal abundance data at a maximum of n=6 plots per site (for theSites included).
 
 At the site scale, mean CDW volume (m^3^/hectare) is simply the mean of the plot scale values; the mean site-scale parameter is robust because of the spatially-balanced, stratified-random nature of the TOS Spatial Design. When comparing CDW volume and Small Mammal abundance at the site scale, CDW data from all Distributed plots are used for the calculation.
 
@@ -498,7 +498,7 @@ plotCdwVol <- filterCDW %>%
   ) %>%
   dplyr::mutate(cdwVol = volumeFactor * logCount)
 
-#   Second, identify plots with all three transects with no logs and bind to log count output from above
+#   Second, identify plots where all three transects do not have logs and bind to log count output from above
 noLogs <- filterCDW %>%
   dplyr::filter(targetTaxaPresent=="N") %>%
   dplyr::group_by(domainID, siteID, volumeFactor, eventID, plotID) %>%
@@ -535,7 +535,7 @@ DT::datatable(
   filter = "none",
   rownames = FALSE,
   options = list(pageLength = 10),
-  caption = "CDW volume density estimates by plotID for selected sites and eventIDs. The 'Plot subtype' column indicates whether a given CDW plot is collocated with a Small Mammal sampling grid."
+  caption = "CDW volume density estimates by plotID for selected sites and eventIDs. The 'Plot subtype' column indicates whether a given CDW plot is colocated with a Small Mammal sampling grid."
 )
 
 
@@ -856,7 +856,7 @@ siteDF <- siteCdwVol %>%
 
 ### Create graphs of CDW and MAM data at plot and site spatial scales
 
-We first examine the potential relationship between CDW volume and Small Mammal abundance using data from all spatially collocated plots from all of the six forested sites we selected (HARV, JERC, STEI, UKFS, RMNP, and ABBY).
+We first examine the potential relationship between CDW volume and Small Mammal abundance using data from all spatially colocated plots from all of the six forested sites we selected (HARV, JERC, STEI, UKFS, RMNP, and ABBY).
 
 ``` {r generateGraph-allPlots, message=FALSE}
 ### Create graph of CDW volume vs. MAM maximum abundance across all plots and sites
@@ -883,10 +883,10 @@ plotsGraph
 
 ```
 
-- Across a selection of close-canopy forested NEON sites, measurements of CDW volume (m^3^/ha) and Small Mammal abundance (count/ha) reveal no clear correlation at the collocated plot-scale.
+- Across a selection of close-canopy forested NEON sites, measurements of CDW volume (m^3^/ha) and Small Mammal abundance (count/ha) reveal no clear correlation at the colocated plot-scale.
 - The Pearson's correlation coefficient is: `r round(cor(plotDF$cdwVol, plotDF$plotMaxAbundance), digits = 2)`.
 
-Next, we check for correlations between CDW volume and Small Mammal abundance within sites using collocated plot-scale data.
+Next, we check for correlations between CDW volume and Small Mammal abundance within sites using colocated plot-scale data.
 
 ``` {r generateGraph-allPlotsBySite, message=FALSE}
 ### Create graph of CDW volume vs. MAM maximum abundance across plots within site
@@ -953,11 +953,11 @@ sitesGraph
 
 ## Conclusions
 
-- Coarse Downed Wood volume (m^3^/ha) and Small Mammal abundance (count/ha) can each be calculated at the plot-level, and spatially collocated plots are identified by a shared `plotID`. 
+- Coarse Downed Wood volume (m^3^/ha) and Small Mammal abundance (count/ha) can each be calculated at the plot-level, and spatially colocated plots are identified by a shared `plotID`. 
     - It is possible to identify shared `plotID` values programmatically using the `geoNEON::getLocByName()`function (lines 120-125), or by downloading the CDW and Small Mammal datasets and joining via the `plotID` (lines 743-751).
-    - Note that more `plotID` values may be identified as collocated via the `geoNEON` function than via the table joining method due to the fact that `getLocByName()` identifieds all `plotIDs` that have ever been used for a given protocol, and not just those locations that are currently in use.
+    - Note that more `plotID` values may be identified as colocated via the `geoNEON` function than via the table joining method due to the fact that `getLocByName()` identifieds all `plotIDs` that have ever been used for a given protocol, and not just those locations that are currently in use.
 - Plot-scale spatial collocation of TOS data products allows data users to investigate patterns within NEON sites.
-- All NEON TOS data products are collocated at the site-scale. Site-level estimates may be useful for investigating patterns at very large spatial scales.
+- All NEON TOS data products are colocated at the site-scale. Site-level estimates may be useful for investigating patterns at very large spatial scales.
 
 
 

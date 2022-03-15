@@ -439,7 +439,9 @@ mam_trapNight_nodups <- neonOS::removeDups(
   variables = variables_10072,
   table = "mam_pertrapnight"
 ) 
-# Output: Two unresolveable duplicates flagged with duplicateRecordQF=2
+#   Output: Two unresolveable duplicates flagged with duplicateRecordQF=2, which indicates records that are
+#   identical based on primary keys but contain different values in other fields; see ?neonOS::removeDups
+#   documentation for additional information on duplicate record flagging.
 
 
 ##  Follow-up trouble-shooting to deal with unresolveable duplicates
@@ -535,7 +537,8 @@ DT::datatable(
   filter = "none",
   rownames = FALSE,
   options = list(pageLength = 10),
-  caption = "CDW volume density estimates by plotID for selected sites and eventIDs. The 'Plot subtype' column indicates whether a given CDW plot is colocated with a Small Mammal sampling grid."
+  caption = "CDW volume density estimates by plotID for selected sites and eventIDs. The 'Plot subtype'
+  column indicates whether a given CDW plot is colocated with a Small Mammal sampling grid."
 )
 
 
@@ -792,7 +795,8 @@ DT::datatable(
   filter = "none",
   rownames = FALSE,
   options = list(pageLength = 10),
-  caption = "Small Mammal abundance metrics (count/ha) by plotID for selected sites for a 3-year window centered on the year that CDW volume was measured."
+  caption = "Small Mammal abundance metrics (count/ha) by plotID for selected sites for a 3-year
+  window centered on the year that CDW volume was measured."
 )
 
 
@@ -819,7 +823,8 @@ DT::datatable(
   filter = "none",
   rownames = FALSE,
   options = list(pageLength = 10),
-  caption = "Small Mammal abundance metrics (count/ha) by siteID for selected sites for a 3-year window centered on the year that CDW volume was measured."
+  caption = "Small Mammal abundance metrics (count/ha) by siteID for selected sites for a 3-year
+  window centered on the year that CDW volume was measured."
 )
 
 ```

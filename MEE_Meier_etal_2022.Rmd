@@ -10,17 +10,17 @@ output:
     highlight: tango
 ---
 
-```{r setup, include=FALSE, message=FALSE}
+```{r setup, include=FALSE, message=FALSE, warning=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 
 ##  Load required CRAN packages
 #   Define list of needed CRAN packages
 cranPackages <- c(
+  "tidyverse",
   "devtools", # Load packages from Github not available on CRAN
   "data.table",
   "DT", # Data Table display tools for html output
-  "neonUtilities", # Tools to retrieve data from the NEON Portal
-  "tidyverse"
+  "neonUtilities" # Tools to retrieve data from the NEON Portal
 )
 
 #   Load packages if installed, install and load if not installed
@@ -86,24 +86,25 @@ The NEON 'Coarse downed wood log survey' data product citation is:
 ``` {r cdwLoadData, results=FALSE, message=FALSE}
 ### Retrieve CDW Tally data for last 6 years from NEON Data Portal for all sites and dates
 
-# cdwDP <- neonUtilities::loadByProduct(
-#   dpID = "DP1.10010.001",
-#   site = "all",
-#   startdate = "2016-01",
-#   enddate = "2021-12",
-#   package = "basic",
-#   release = "RELEASE-2022",
-#   tabl = "all",
-#   check.size = FALSE,
-#   token = Sys.getenv('NEON_PAT')
-# )
-# 
-# #   Extract the field tally data from the download list, and save for quicker read-in
-# cdw <- cdwDP$cdw_fieldtally
-# saveRDS(cdw, file = "cdw_fieldTally_2016-2021.RDS")
+cdwDP <- neonUtilities::loadByProduct(
+  dpID = "DP1.10010.001",
+  site = "all",
+  startdate = "2016-01",
+  enddate = "2021-12",
+  package = "basic",
+  release = "RELEASE-2022",
+  tabl = "all",
+  check.size = FALSE,
+  token = Sys.getenv('NEON_PAT')
+)
 
-#   Read in data saved via neonUtilities code chunk above
-cdw <- readRDS(file = "cdw_fieldTally_2016-2021.RDS")
+#   Extract the field tally data from the download list, and save for quicker read-in
+cdw <- cdwDP$cdw_fieldtally
+
+# saveRDS(cdw, file = "cdw_fieldTally_2016-2021.RDS")
+# 
+# #   Read in data saved via neonUtilities code chunk above
+# cdw <- readRDS(file = "cdw_fieldTally_2016-2021.RDS")
 
 #   Summarise data to identify 5-6 sites with recent CDW Tally data from Distributed plots that 
 #   can be paired with MAM data; for demonstration purposes, goal is to choose a small number of 
@@ -157,16 +158,17 @@ tempCDW <- tempCDW %>%
 #   value. Note: The 'data' argument must be a data.frame() and CANNOT be a tibble (the latter is commonly
 #   returned by dplyr).
 
-# mamPlots <- geoNEON::getLocByName(
-#   data = tempCDW,
-#   locCol = "mamNamedLoc",
-#   locOnly = TRUE,
-#   token = Sys.getenv('NEON_PAT')
-# )
+mamPlots <- geoNEON::getLocByName(
+  data = tempCDW,
+  locCol = "mamNamedLoc",
+  locOnly = TRUE,
+  token = Sys.getenv('NEON_PAT')
+)
 
+
+##  Save data locally for quicker subsequent read-in
 # saveRDS(mamPlots, file = "cdw_mam_collocation.RDS")
-
-mamPlots <- readRDS(file = "cdw_mam_collocation.RDS")
+# mamPlots <- readRDS(file = "cdw_mam_collocation.RDS")
 
 #   Third, join tempCDW data with mamPlots and create a 'subtype' column to identify colocated sampling
 tempCDW <- tempCDW %>%
@@ -198,23 +200,23 @@ The NEON 'Small mammal box trapping' data product citation is:
 
 ``` {r mamLoadData, results=FALSE, message=FALSE, warning=FALSE}
 ### Retrieve small mammal box trapping data for same sites and date range as retrieved for CDW
-# mamDP <- neonUtilities::loadByProduct(
-#   dpID = "DP1.10072.001",
-#   site = theSites, #--> same sites identified for CDW
-#   startdate = "2016-01",
-#   enddate = "2021-12",
-#   package = "basic",
-#   release = "RELEASE-2022",
-#   tabl = "all",
-#   check.size = FALSE,
-#   token = Sys.getenv('NEON_PAT')
-# )
-# 
+mamDP <- neonUtilities::loadByProduct(
+  dpID = "DP1.10072.001",
+  site = theSites, #--> same sites identified for CDW
+  startdate = "2016-01",
+  enddate = "2021-12",
+  package = "basic",
+  release = "RELEASE-2022",
+  tabl = "all",
+  check.size = FALSE,
+  token = Sys.getenv('NEON_PAT')
+)
+
 # #   Save to RDS format for quicker read-in
 # saveRDS(mamDP, file = "mam_allTables_2016-2021.RDS")
-
-#   Read in stored MAM data
-mamDP <- readRDS(file = "mam_allTables_2016-2021.RDS")
+# 
+# #   Read in stored MAM data
+# mamDP <- readRDS(file = "mam_allTables_2016-2021.RDS")
 
 #   Convert list tables to dataframes in the Global environment
 list2env(mamDP, envir=.GlobalEnv)
@@ -653,37 +655,37 @@ captures <- mam_trapNight_nodups %>%
 
 ##  Fourth, following the 'Minimum Number Known Alive' (MNKA) approach (Slade & Blair, 2000).
 #   Generate a column of all of the unique tagIDs included in the dataset
-# uTags <- captures %>%
-#   dplyr::select(tagID) %>%
-#   dplyr::filter(!is.na(tagID)) %>%
-#   dplyr::distinct()
-# 
-# #   Create empty data frame to populate with 'for()' loop output
-# capsNew <- dplyr::slice(captures, 0)
-# 
-# #   For each tagged individual, add a record for each night of trapping done in the plots in which it was
-# #   captured between the first and last dates of capture.
-#
-# for (i in uTags$tagID) {
-#   temp <- captures %>% filter(tagID == i)
-#   firstCap <- as.Date(min(temp$collectDate), "YYYY-MM-DD", tz = "UTC")
-#   lastCap <- as.Date(max(temp$collectDate), "YYYY-MM-DD", tz = "UTC")
-#   possibleDates <- seq(as.Date(firstCap), as.Date(lastCap), by="days")
-#   plots <- unique(temp$plotID)
-#   potentialNights <- mam_plotNight_nodups %>%
-#     dplyr::filter(as.character(collectDate) %in% as.character(possibleDates) &
-#              plotID %in% plots) %>%
-#     dplyr::select(nightuid,plotID, collectDate) %>%
-#     dplyr::mutate(tagID = i)
-#   temp2 <- dplyr::left_join(potentialNights, temp)
-#   capsNew <- dplyr::bind_rows(capsNew, temp2)
-# }
-# 
+uTags <- captures %>%
+  dplyr::select(tagID) %>%
+  dplyr::filter(!is.na(tagID)) %>%
+  dplyr::distinct()
+
+#   Create empty data frame to populate with 'for()' loop output
+capsNew <- dplyr::slice(captures, 0)
+
+#   For each tagged individual, add a record for each night of trapping done in the plots in which it was
+#   captured between the first and last dates of capture.
+
+for (i in uTags$tagID) {
+  temp <- captures %>% filter(tagID == i)
+  firstCap <- as.Date(min(temp$collectDate), "YYYY-MM-DD", tz = "UTC")
+  lastCap <- as.Date(max(temp$collectDate), "YYYY-MM-DD", tz = "UTC")
+  possibleDates <- seq(as.Date(firstCap), as.Date(lastCap), by="days")
+  plots <- unique(temp$plotID)
+  potentialNights <- mam_plotNight_nodups %>%
+    dplyr::filter(as.character(collectDate) %in% as.character(possibleDates) &
+             plotID %in% plots) %>%
+    dplyr::select(nightuid,plotID, collectDate) %>%
+    dplyr::mutate(tagID = i)
+  temp2 <- dplyr::left_join(potentialNights, temp)
+  capsNew <- dplyr::bind_rows(capsNew, temp2)
+}
+
 # #   To avoid time-consuming processing, save a copy
 # saveRDS(capsNew, file = "mam_final_dataset.RDS")
-
-#   Read in processed capsNew dataset
-capsNew <- readRDS(file = "mam_final_dataset.RDS")
+# 
+# #   Read in processed capsNew dataset
+# capsNew <- readRDS(file = "mam_final_dataset.RDS")
 
 #   Add untagged individuals back to the dataset
 capsNew <- captures %>%
@@ -978,7 +980,7 @@ Slade, N.A. and Blair, S.M. (2000) An empirical test of using counts of individu
 
 ## Reproducibility
 
-Code was developed and tested using `R v4.1.2`, and key packages with versions as shown below. Worked example code may generate errors if key package versions are earlier than those indicated.
+Code was developed and tested using `R v4.1.2`, and key packages with versions as shown below. Worked example code may generate errors if key package versions are earlier than those indicated. Source code is available via GitHub: https://github.com/NEONScience/mee-tos-2022
 
 ``` {r reproducibility, echo=FALSE, message=FALSE}
 ### Package data frame comes from local system used to develop code

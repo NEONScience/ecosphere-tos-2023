@@ -3,6 +3,9 @@ title: "Meier et al. 2022 - Supporting Information File 2: Example linking NEON 
 author: "Courtney L. Meier, Katherine M. Thibault, and David T. Barnett"
 date: "`r format(Sys.Date(), format = '%B %d, %Y')`"
 output: 
+  pdf_document: 
+    toc: yes
+    latex_engine: xelatex
   html_document:
     toc: true
     toc_depth: 3

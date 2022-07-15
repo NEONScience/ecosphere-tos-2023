@@ -115,9 +115,9 @@ The NEON 'Coarse downed wood log survey' data product citation is:
 #   Read in data saved via neonUtilities code chunk above
 cdw <- readRDS(file = "cdw_fieldTally_2016-2021.RDS")
 
-#   Summarise data to identify 5-6 sites with recent CDW Tally data from Distributed plots that 
-#   can be paired with MAM data; for demonstration purposes, goal is to choose a small number of 
-#   forested sites that span a range of habitats.
+#   Summarise data to identify 5-6 sites with recent CDW Tally data from Distributed plots
+#   that can be paired with MAM data; for demonstration purposes, goal is to choose a 
+#   small number of forested sites that span a range of habitats.
 summaryDist <- cdw %>%
   dplyr::filter(plotType == "distributed") %>%
   dplyr::group_by(domainID, siteID, eventID, samplingImpractical) %>%
@@ -126,7 +126,8 @@ summaryDist <- cdw %>%
 #   From 'summaryDist' output, select 6 sites with closed-canopy forest
 theSites <- c("HARV","JERC","STEI","UKFS","RMNP","ABBY")
 
-#   Filter CDW data to selected sites, filter to most recent eventID, remove unneeded columns
+#   Filter CDW data to selected sites, filter to most recent eventID,
+#   remove unneeded columns
 tempCDW <- cdw %>%
   dplyr::filter(plotType == "distributed",
                 siteID %in% theSites) %>%
@@ -142,10 +143,11 @@ tempCDW <- cdw %>%
 
 
 ### Identify plotIDs in CDW dataset that are colocated with MAM sampling grids
-#   First, create MAM 'namedLocation' value for each CDW namedLocation value (e.g., 'HARV_001.mammalGrid.mam');
-#   the goal is to check whether each CDW namedLocation has a colocated MAM namedLocation. The structure
-#   of the namedLocation value for any NEON data product can be determined by downloading data and 
-#   checking the namedLocation field.
+#   First, create MAM 'namedLocation' value for each CDW namedLocation value (e.g.,
+#   'HARV_001.mammalGrid.mam'); the goal is to check whether each CDW namedLocation has a
+#   colocated MAM namedLocation. The structure of the namedLocation value for any NEON 
+#   data product can be determined by downloading data and checking the namedLocation
+#   field.
 
 tempCDW <- tempCDW %>%
   dplyr::mutate(
@@ -158,11 +160,12 @@ tempCDW <- tempCDW %>%
   ) %>%
   as.data.frame()
 
-#   Second, retrieve namedLocation data for each mamNamedLoc value that was constructed above; if a CDW
-#   namedLocation is also a MAM namedLocation, the geoNEON::getLocByName() function will return a value from
-#   the NEON API; if a CDW namedLocation is not also a MAM namedLocation, the function does not return a
-#   value. Note: The 'data' argument must be a data.frame() and CANNOT be a tibble (the latter is commonly
-#   returned by dplyr).
+#   Second, retrieve namedLocation data for each mamNamedLoc value that was constructed
+#   above; if a CDW namedLocation is also a MAM namedLocation, the geoNEON::getLocByName()
+#   function will return a value from the NEON API; if a CDW namedLocation is not also a 
+#   MAM namedLocation, the function does not return a value. Note: The 'data' argument 
+#   must be a data.frame() and CANNOT be a tibble (the latter is commonly returned by
+#   dplyr).
 
 # mamPlots <- geoNEON::getLocByName(
 #   data = tempCDW,
@@ -176,7 +179,8 @@ tempCDW <- tempCDW %>%
 # saveRDS(mamPlots, file = "cdw_mam_collocation.RDS")
 mamPlots <- readRDS(file = "cdw_mam_collocation.RDS")
 
-#   Third, join tempCDW data with mamPlots and create a 'subtype' column to identify colocated sampling
+#   Third, join tempCDW data with mamPlots and create a 'subtype' column to identify 
+#   colocated sampling
 tempCDW <- tempCDW %>%
   dplyr::left_join(mamPlots %>%
                      select(plotID, subtype),
@@ -203,7 +207,7 @@ The NEON 'Small mammal box trapping' data product citation is:
 
 
 ``` {r mamLoadData, results=FALSE, message=FALSE, warning=FALSE}
-### Retrieve small mammal box trapping data for same sites and date range as retrieved for CDW
+### Retrieve small mammal box trapping data for same sites and date range as CDW
 # mamDP <- neonUtilities::loadByProduct(
 #   dpID = "DP1.10072.001",
 #   site = theSites, #--> same sites identified for CDW
@@ -230,7 +234,10 @@ list2env(mamDP, envir=.GlobalEnv)
 #   https://www.neonscience.org/resources/learning-hub/tutorials/neon-api-usage
 #   using the verbose option to get the taxonProtocolCategory field
 mam.req <- httr::GET(
-  "https://data.neonscience.org/api/v0/taxonomy/?taxonTypeCode=SMALL_MAMMAL&verbose=true&offset=0&limit=1000"
+  paste0(
+    "https://data.neonscience.org/api/v0/taxonomy/?",
+    "taxonTypeCode=SMALL_MAMMAL&verbose=true&offset=0&limit=1000"
+  )
 )
 mam.list <- jsonlite::fromJSON(httr::content(mam.req, as = "text"))
 
@@ -253,17 +260,18 @@ For CDW tally data, prior to analysis it is important to:
 
 
 ``` {r cdwDataQC, results=FALSE, message=FALSE}
-### Check for individualID duplicates; duplicate checks are important because log counts are used 
-### to estimate CDW volume
-#   First, construct an individualID for logs < 10 cm diameter that are not tagged; smaller logs are not 
-#   tagged and are given a unique temporary logID beginning with 'L' since they are less likely to persist
-#   over the 5-year CDW Tally measurement interval; 
+### Check for individualID duplicates; duplicate checks are important because log counts
+### are used to estimate CDW volume
+#   First, construct an individualID for logs < 10 cm diameter that are not tagged; 
+#   smaller logs are not tagged and are given a unique temporary logID beginning with 'L'
+#   since they are less likely to persist over the 5-year CDW Tally measurement interval; 
 #   Second, construct a primary key from plotID, date, lidsAzimuth, and individualID.
 
 tempCDW <- tempCDW %>%
   dplyr::mutate(
     individualID = case_when(
-      is.na(individualID) & targetTaxaPresent == "Y" ~ paste("NEON.CDW", domainID, plotID, logID, sep = "."),
+      is.na(individualID) &
+        targetTaxaPresent == "Y" ~ paste("NEON.CDW", domainID, plotID, logID, sep = "."),
       TRUE ~ individualID
     ),
     key = paste(plotID, date, lidsAzimuth, individualID, sep = "_")
@@ -276,11 +284,11 @@ cdwDupsKey <- tempCDW %>%
 
 cdwDups <- tempCDW %>%
   dplyr::filter(key %in% cdwDupsKey$key)
-# Log data assessment for dups: Only first one listed appears to be a real duplicate based on 
-# examination of other data fields; ABBY records are mis-indentified by the function as 'dups'
-# because transect was reflected (i.e., not real duplicates).
+# Log data assessment for dups: Only first one listed appears to be a real duplicate 
+# based on examination of other data fields; ABBY records are mis-indentified by the 
+# function as 'dups' because transect was reflected (i.e., not real duplicates).
 
-#   Remove second instance of cdwDups$key=="STEI_002_2016-05-26_320_NEON.CDW.D05.00375"
+# Remove second instance of cdwDups$key=="STEI_002_2016-05-26_320_NEON.CDW.D05.00375"
 cdwRemoveDup <- cdwDups %>%
   dplyr::distinct(key)
 
@@ -292,13 +300,15 @@ tempCDW <- tempCDW %>%
 
 ### Perform QC checks for volumeFactor, logDistance, and equivalentLogDiameter
 ##  Volume Factor: Check value matches protocol and flag if no match
-#   Read in CDW volumeFactor and transectLength look-up table derived from protocol (NEON.DOC.001711).
-#   Note that RMNP has different F-values and transect lengths for Distributed and Tower plots due
-#   to distant parcels of land used for each plot type and different forest types. The RMNP values in
-#   this table are specific to Distributed plots since we wish to compare data with Small Mammal data.
+#   Read in CDW volumeFactor and transectLength look-up table derived from protocol 
+#   (NEON.DOC.001711). Note that RMNP has different F-values and transect lengths for 
+#   Distributed and Tower plots due to distant parcels of land used for each plot type and
+#   different forest types. The RMNP values in this table are specific to Distributed 
+#   plots since we wish to compare data with Small Mammal data.
 cdwParam <- read.csv(file = "cdw_siteParamLookup.csv", header = TRUE)
 
-#   Join look-up table values with CDW data and flag records with incorrect volume factor (i.e., f-value)
+#   Join look-up table values with CDW data and flag records with incorrect volume factor
+#   (i.e., f-value)
 tempCDW <- tempCDW %>%
   dplyr::left_join(cdwParam %>% dplyr::select(siteID, fValue, transectLength),
                    by = "siteID") %>%
@@ -312,10 +322,11 @@ tempCDW <- tempCDW %>%
 fCheck <- tempCDW %>%
   dplyr::filter(fValQF == 1) %>%
   dplyr::select(domainID, siteID, volumeFactor, fValue, fValQF)
-#   volumeFactor problems identified for HARV and STEI; volumeFactor is supposed to be assigned
-#   at the site level and should not vary from plot-to-plot. The variation in the data likely
-#   reflects a data entry error. We encourage data users to let NEON staff know about issues 
-#   they discover like this one: https://www.neonscience.org/about/contact-us
+#   volumeFactor problems identified for HARV and STEI; volumeFactor is supposed to be 
+#   assigned at the site level and should not vary from plot-to-plot. The variation in 
+#   the data likely reflects a data entry error. We encourage data users to let NEON 
+#   staff know about issues they discover like this one: 
+#   https://www.neonscience.org/about/contact-us
 
 #   Correct volumeFactor data for HARV, STEI sites based on fCheck results
 tempCDW <- tempCDW %>%
@@ -327,8 +338,9 @@ tempCDW <- tempCDW %>%
   ))
 
 
-### Tally QC checks: Verify that logs in the dataset should be tallied based on protocol criteria
-##  Log Distance: Check for values that exceed maximum transect length as defined in protocol, then flag
+### Tally QC checks: Verify that logs should be tallied based on protocol criteria
+##  Log Distance: Check for values that exceed maximum transect length as defined in 
+##  protocol, then flag
 tempCDW <- tempCDW %>%
   dplyr::mutate(
     logDistQF = case_when(
@@ -338,12 +350,13 @@ tempCDW <- tempCDW %>%
     )) 
 
 
-##  Check whether logDistance is <= limitingDistance, as expected, based on equivalentLogDiameter, and flag
+##  Check whether logDistance is <= limitingDistance, as expected, based on 
+##  equivalentLogDiameter, and flag
 #   Use formula to calculate limiting distance from Affleck 2010, Appendix A:
 #   limitingDist = ((pi^2)*(roundDiameter^2))/(8*transectNum*fValue), where
-#   roundDiameter = round diameter of the log (cm), taken from the equivalentLogDiameter field in NEON data
-#   transectNum = integer value for the number of transects established from a survey point (3 for NEON plots),
-#   fValue = the F value assigned at the site level, taken from the volumeFactor field in NEON data
+#   roundDiameter = round diameter of the log (cm); equivalentLogDiameter in NEON data
+#   transectNum = number of transects established from a survey point (3 for NEON plots),
+#   fValue = the F value assigned at the site level; volumeFactor field in NEON data
 tempCDW <- tempCDW %>%
   dplyr::mutate(
     limitingDist = round(((pi^2)*(equivalentLogDiameter^2))/(8*3*volumeFactor), digits=2)
@@ -375,26 +388,27 @@ filterCDW <- tempCDW %>%
 mam_plotNight_nodups <- neonOS::removeDups(data = mam_perplotnight,
                                            variables = variables_10072,
                                            table = "mam_perplotnight")
-# Running this check generated the message: Primary key fields contain NA values and/or empty strings.
-# Results may be unreliable; check input data carefully. - followed by an error message
+# Running this check generated the message: Primary key fields contain NA values and/or 
+# empty strings. Results may be unreliable; check input data carefully.
 
 
 ##  To troubleshoot, first query the table to find the problematic records
 problems <- which(is.na(mam_perplotnight$nightuid))
 
-#   Next, check the mam_pertrapnight table to see if there are corresponding records that might 
-#   have a nightuid
+#   Next, check the mam_pertrapnight table to see if there are corresponding records that
+#   might have a nightuid
 temp <- mam_pertrapnight %>%
   dplyr::filter(
     plotID %in% mam_perplotnight$plotID[problems] &
       collectDate %in% mam_perplotnight$collectDate[problems]
   )
-# Since the remaining fields were populated and there are captures for each, these records appear to 
-# represent a valid night of trapping. So, we will assign custom temporary nightuids in both tables here.
-# As an aside, we encourage users to let NEON staff know about issues they discover like this one: 
-# (https://www.neonscience.org/about/contact-us).
+# Since the remaining fields were populated and there are captures for each, these 
+# records appear to represent a valid night of trapping. So, we will assign custom 
+# temporary nightuids in both tables here. As an aside, we encourage users to let NEON 
+# staff know about issues they discover like this one: 
+# https://www.neonscience.org/about/contact-us
 
-#   Create custom nightuids for duplicates identified above that are missing primary key value
+#   Create custom nightuids for identified duplicates missing primary key value
 mam_perplotnight_adj <- mam_perplotnight %>%
   dplyr::mutate(nightuid = paste(plotID, '_', collectDate, sep = ''))
 
@@ -408,13 +422,14 @@ mam_plotNight_nodups <- neonOS::removeDups(data = mam_perplotnight_adj,
 # No duplicate key values found
 
 
-### Second, check the mam_pertrapnight table by nightuid and trapcoordinate using the standard 
-### neonOS::removeDups() function. 
+### Second, check the mam_pertrapnight table by nightuid and trapcoordinate using the 
+### standard neonOS::removeDups() function. 
 
-#   Note that RELEASE 2022 contains ~142K records for theSites downloaded, so this operation can take some
-#   time. In rare cases, multiple animals can be captured in a single trap on the same night and not all 
-#   receive unique tagIDs or individualCodes. This means that the duplicate function is not effective for 
-#   these records; here, we remove these records prior to running the standard check, and we then add these
+#   Note that RELEASE 2022 contains ~142K records for theSites downloaded, so this 
+#   operation can take some time. In rare cases, multiple animals can be captured in a 
+#   single trap on the same night and not all receive unique tagIDs or individualCodes. 
+#   This means that the duplicate function is not effective for these records; here, we
+#   remove these records prior to running the standard check, and we then add these
 #   records back to the data frame afterwards.
 
 mam_trapNight_multipleCaps <- mam_pertrapnight_adj %>%
@@ -427,9 +442,10 @@ mam_trapNight_remainingRecords <- mam_pertrapnight_adj %>%
 mam_trapNight_nodups <- neonOS::removeDups(data = mam_trapNight_remainingRecords,
                                            variables = variables_10072,
                                            table = "mam_pertrapnight") 
-#   Output: Two unresolveable duplicates flagged with duplicateRecordQF=2, which indicates records that are
-#   identical based on primary keys but contain different values in other fields; see ?neonOS::removeDups
-#   documentation for additional information on duplicate record flagging.
+#   Output: Two unresolveable duplicates flagged with duplicateRecordQF=2, which 
+#   indicates records that are identical based on primary keys but contain different 
+#   values in other fields; see ?neonOS::removeDups documentation for additional 
+#   information on duplicate record flagging.
 
 
 ##  Follow-up trouble-shooting to deal with unresolveable duplicates
@@ -437,14 +453,14 @@ mam_trapNight_nodups <- neonOS::removeDups(data = mam_trapNight_remainingRecords
 
 which(is.na(mam_pertrapnight_adj$nightuid)) #--> yields 0 
 which(is.na(mam_pertrapnight_adj$trapCoordinate)) #--> yields 0
-# Two lines above mean that trapID and individualCode are the source of the NAs, which is expected
-# based on the protocol.
+# Two lines above mean that trapID and individualCode are the source of the NAs, which is
+# expected based on the protocol.
 
 #   Next, check that the unresolved duplicates will not impact the intended analyses
 dupCheck <- mam_trapNight_nodups %>%
   dplyr::filter(duplicateRecordQF == 2 &
                   trapStatus != "4 - more than 1 capture in one trap")
-# No records in the set, so these unresolved duplicates will not impact the intended analyses
+# No records in the set; unresolved duplicates will not impact the intended analyses
 
 
 ##  Add multiple capture records back to dataset
@@ -474,9 +490,9 @@ At the site scale, mean CDW volume (m^3^/hectare) is simply the mean of the plot
 
 ``` {r cdwVolumeEstimates, message=FALSE}
 ### Calculate CDW volume for each plotID in the cleaned dataset
-#   First, focus on plots with targetTaxaPresent=="Y" --> i.e., at least one qualifying log was tallied
-#   within the plot. To do this, temporarily remove records for transects with no logs, and remove
-#   records with samplingImpractical != "OK".
+#   First, focus on plots with targetTaxaPresent=="Y" --> i.e., at least one qualifying 
+#   log was tallied within the plot. To do this, temporarily remove records for transects
+#   with no logs, and remove records with samplingImpractical != "OK".
 plotCdwVol <- filterCDW %>%
   dplyr::filter(is.na(samplingImpractical) |
                   samplingImpractical == "OK") %>%
@@ -485,7 +501,8 @@ plotCdwVol <- filterCDW %>%
   dplyr::summarise(logCount = n()) %>%
   dplyr::mutate(cdwVol = volumeFactor * logCount)
 
-#   Second, identify plots where all three transects do not have logs and bind to log count output from above
+#   Second, identify plots where all three transects do not have logs and bind to log 
+#   count output from above
 noLogs <- filterCDW %>%
   dplyr::filter(targetTaxaPresent == "N") %>%
   dplyr::group_by(domainID, siteID, volumeFactor, eventID, plotID) %>%
@@ -562,9 +579,9 @@ Here, we employ the minimum number known alive (MNKA) approach to estimate total
 Note: At the time of writing it is necessary to create Small Mammal `eventIDs` for legacy data collected prior to 2021. For the Small Mammal product, `eventIDs` correspond to discrete sampling bouts that represent a group of consecutive nights of trapping scheduled around a particular new moon. For the NEON 'RELEASE-2023' data, the omission of `eventID` from legacy data will be fixed and the code below that creates `eventIDs` will be moot.
 
 ``` {r mamFinalizeDatasets, results='asis', message=FALSE}
-### Create eventID grouping variable using mam_plotNight data and add to mam_trapNight data
-#   Assign the same eventID to each record with an endDate no more than 10 days later than the previously
-#   created record.
+### Create eventID grouping variable using mam_plotNight data and add to mam_trapNight 
+#   Assign the same eventID to each record with an endDate no more than 10 days later 
+#   than the previously created record.
 mam_plotNight_nodups <- mam_plotNight_nodups %>%
   dplyr::mutate(year = as.integer(format(collectDate, "%Y")),
                 .before = eventID) %>%
@@ -587,7 +604,8 @@ mam_plotNight_nodups <- mam_plotNight_nodups %>%
   ) %>%
   dplyr::ungroup() %>%
   dplyr::select(-priorEndDate, -diffDays, -boutIncrement, -boutNum)
-# Above, shift() defaults to type = "lag", which returns the previous row value for the specified column
+# Above, shift() defaults to type = "lag", which returns the previous row value for the
+# specified column
 
 #   Add nightuid and eventID from mam_plotNight_nodups to mam_trapNight_nodups
 mam_trapNight_nodups <- mam_trapNight_nodups %>%
@@ -599,19 +617,21 @@ mam_trapNight_nodups <- mam_trapNight_nodups %>%
 
 ### Create and finalize Small Mammal capture dataset for selected sites
 
-##  First, subset trapping data to only the capture records, i.e., the records that describe a captured small 
-##  mammal, including only those taxa for which the trapping protocol is designed. Subsetting can be done with
-##  a simple filtering based on 'trapStatus' and 'taxonProtocolCategory'; however, we first check to ensure 
-##  all captures have the correct 'trapStatus' - i.e., check if tagIDs exist but trap status does not include
-##  "capture".
+##  First, subset trapping data to only the capture records, i.e., the records that 
+##  describe a captured small mammal, including only those taxa for which the trapping
+##  protocol is designed. Subsetting can be done with a simple filtering based on 
+##  'trapStatus' and 'taxonProtocolCategory'; however, we first check to ensure all 
+##  captures have the correct 'trapStatus' - i.e., check if tagIDs exist but trap 
+##  status does not include "capture".
 
 problemRecords <- mam_trapNight_nodups %>%
   dplyr::filter(!is.na(tagID),
                 !grepl("capture", trapStatus))
 
-#   If nrow(problemRecords) > 0, update the corresponding trapStatus fields to "5 - capture" or, in the rare 
-#   case where there are multiple captures in one trap, "4 - more than 1 capture in one trap" - this rare 
-#   case does not occur in the current dataset, so it is not addressed here.
+#   If nrow(problemRecords) > 0, update the corresponding trapStatus fields to 
+#   "5 - capture" or, in the rare case where there are multiple captures in one trap, 
+#   "4 - more than 1 capture in one trap" - this rare case does not occur in the current
+#   dataset, so it is not addressed here.
 mam_trapNight_nodups <- mam_trapNight_nodups %>%
   dplyr::mutate(trapStatus = case_when(uid %in% problemRecords$uid ~ "5 - capture",
                                        TRUE ~ trapStatus))
@@ -630,7 +650,7 @@ captures <- mam_trapNight_nodups %>%
   dplyr::select(uid, nightuid, plotID, collectDate, tagID)
 
 
-##  Fourth, following the 'Minimum Number Known Alive' (MNKA) approach (Slade & Blair, 2000).
+##  Fourth, use the 'Minimum Number Known Alive' (MNKA) approach (Slade & Blair, 2000).
 #   Generate a column of all of the unique tagIDs included in the dataset
 uTags <- captures %>%
   dplyr::select(tagID) %>%
@@ -640,8 +660,8 @@ uTags <- captures %>%
 #   Create empty data frame to populate with 'for()' loop output
 capsNew <- dplyr::slice(captures, 0)
 
-#   For each tagged individual, add a record for each night of trapping done in the plots in which it was
-#   captured between the first and last dates of capture.
+#   For each tagged individual, add a record for each night of trapping done in the plots
+#   in which it was captured between the first and last dates of capture.
 
 # for (i in uTags$tagID) {
 #   temp <- captures %>% filter(tagID == i)
@@ -669,8 +689,8 @@ capsNew <- captures %>%
   dplyr::filter(is.na(tagID)) %>%
   dplyr::bind_rows(capsNew)
 
-#   Add eventID to enable summarizing by trapping bouts (includes up to 3 nights of trapping for some plots
-#   in each bout, 1 night for other plots).
+#   Add eventID to enable summarizing by trapping bouts (includes up to 3 nights of 
+#   trapping for some plots in each bout, 1 night for other plots).
 capsNew <- capsNew %>%
   dplyr::left_join(mam_plotNight_nodups %>%
                      dplyr::select(eventID, nightuid),
@@ -683,8 +703,8 @@ capsNew <- capsNew %>%
 Next, we define a function to calculate MNKA for each plot within each bout. The function requires the `capsNew` data set generated above as an input, as well as a list of plots of interest (`plotsOI`), in the event that the `capsNew` data contain records from more plots than are needed for the MNKA estimation.
 
 ``` {r mamDensityFunctions, results='asis', message=FALSE}
-### Define function to calculate MNKA for each plot within bout; 'plotsOI' is a required input vector of 
-### plotIDs for which MNKA per plot per bout is desired.
+### Define function to calculate MNKA for each plot within bout; 'plotsOI' is a required
+### input vector of plotIDs for which MNKA per plot per bout is desired.
 
 mnka_per_plot_per_bout <- function(capture_data, plotsOI) {
   caps <- capture_data %>%
@@ -711,18 +731,16 @@ mnka_per_plot_per_bout <- function(capture_data, plotsOI) {
 
 ```
 
-We now use the MNKA small mammal density function to calculate MNKA at the plot scale and site scale in order to compare to CDW volume density data calculated above. Because CDW volume does not change rapidly, and small mammal abundance may change substantially both within and among years, here we generate the maximum small mammal abundance for a given plot for a three-year window centered on the year that logs were tallied for CDW.
+We now use the MNKA small mammal density function to calculate MNKA at the plot scale and site scale in order to compare to CDW volume density data calculated above. Because CDW volume does not change rapidly, and small mammal abundance may change substantially both within and among years, here we generate the maximum small mammal abundance for a given plot for a three-year window centered on the year that logs were tallied for CDW. Researchers may choose any number of different methods to integrate TOS data products with different temporal sampling frequencies (below, we also calculate mean, median, and minimum per-plot MAM abundance), and additional methods beyond those shown here will all give a different statistical result. 
 
 ``` {r mamMnkaEstimates, message=FALSE}
-### Calculate MNKA per plot per bout for all data in processed capsNew dataset and select 3-year window of
-### data appropriate for each site in order to match up with CDW volume data.
+### Calculate MNKA per plot per bout for all data in processed capsNew dataset and select
+### 3-year window of data appropriate for each site in order to match up with CDW volume.
 
-plotBoutMNKA <- mnka_per_plot_per_bout(
-  capture_data = capsNew,
-  plotsOI = unique(capsNew$plotID)
-)
+plotBoutMNKA <- mnka_per_plot_per_bout(capture_data = capsNew,
+                                       plotsOI = unique(capsNew$plotID))
 
-#   Create table of MAM data within 3-year windows by site based on year of CDW volume data
+#   Create table of MAM data within 3-year windows by site based on year of CDW volume
 mamSiteYears <- plotCdwVol %>%
   dplyr::ungroup() %>%
   dplyr::distinct(domainID, siteID, eventID) %>%
@@ -732,23 +750,18 @@ mamSiteYears <- plotCdwVol %>%
     maxMamYear = cdwYear + 1
   )
 
-#   Calculate plot-specific MNKA across bouts: Join plotBoutMNKA and mamSiteYears, filter to records within
-#   3-year window centered on CDW measurement year, and determine maximum small mammal abundance for each 
-#   plot, as well as other per plot metrics.
+#   Calculate plot-specific MNKA across bouts: Join plotBoutMNKA and mamSiteYears, 
+#   filter to records within 3-year window centered on CDW measurement year, and 
+#   determine maximum small mammal abundance for each plot, as well as other per plot
+#   metrics.
 plotMNKA <- plotBoutMNKA %>%
-  dplyr::left_join(
-    mamSiteYears %>% 
-      dplyr::select(
-        siteID,
-        minMamYear,
-        maxMamYear
-      ),
-    by = "siteID"
-  ) %>%
-  dplyr::filter(
-    year >= minMamYear,
-    year <= maxMamYear
-  ) %>%
+  dplyr::left_join(mamSiteYears %>%
+                     dplyr::select(siteID,
+                                   minMamYear,
+                                   maxMamYear),
+                   by = "siteID") %>%
+  dplyr::filter(year >= minMamYear,
+                year <= maxMamYear) %>%
   dplyr::group_by(siteID, plotID) %>%
   dplyr::summarise(
     plotMeanAbundance = round(mean(n), digits = 1),
@@ -761,47 +774,54 @@ plotMNKA <- plotBoutMNKA %>%
 
 
 ##  Display table of plot-level MNKA parameters
-DT::datatable(
-  data = plotMNKA %>% dplyr::rename(
-    "Mean Abundance (count/ha)" = plotMeanAbundance,
-    "Median Abundance (count/ha)" = plotMedAbundance,
-    "Min Abundance (count/ha)" = plotMinAbundance,
-    "Max Abundance (count/ha)" = plotMaxAbundance,
-    "Bout Count by Plot" = plotBoutCount
-  ),
-  filter = "none",
-  rownames = FALSE,
-  options = list(pageLength = 10),
-  caption = "Small Mammal abundance metrics (count/ha) by plotID for selected sites for a 3-year
-  window centered on the year that CDW volume was measured."
+knitr::kable(
+  x = plotMNKA %>%
+    dplyr::ungroup() %>%
+    dplyr::rename(
+      "Mean Abundance (count/ha)" = plotMeanAbundance,
+      "Median Abundance (count/ha)" = plotMedAbundance,
+      "Min Abundance (count/ha)" = plotMinAbundance,
+      "Max Abundance (count/ha)" = plotMaxAbundance,
+      "# Bouts Sampled" = plotBoutCount
+    ) %>%
+    dplyr::slice_head(n = 5),
+  row.names = FALSE,
+  caption = "Example subset of Small Mammal abundance metrics (count/ha) by plotID for
+  selected sites for a 3-year window centered on the year that CDW volume was measured."
 )
 
 
+
 ### Calculate MNKA metrics per site based on plot-level data
+#   siteMeanAbundance = mean abundance across plots within a site
+#   siteMedAbundance = median abundance across plots within a site
+#   siteMinAbundance = average minimum abundance across plots within a site
+#   siteMaxAbundance = average maximum abundance across plots within a site
+
 siteMNKA <- plotMNKA %>%
   dplyr::group_by(siteID) %>%
   dplyr::summarise(
-    siteMeanAbundance = round(mean(plotMeanAbundance), digits = 1), #--> mean abundance across plots
-    siteMedAbundance = round(median(plotMedAbundance), digits = 1), #--> median abundance across plots
-    siteMinAbundance = round(mean(plotMinAbundance), digits = 1), #--> average min abundance across plots
-    siteMaxAbundance = round(mean(plotMaxAbundance), digits = 1) #--> average max abundance across plots
+    siteMeanAbundance = round(mean(plotMeanAbundance), digits = 1),
+    siteMedAbundance = round(median(plotMedAbundance), digits = 1),
+    siteMinAbundance = round(mean(plotMinAbundance), digits = 1),
+    siteMaxAbundance = round(mean(plotMaxAbundance), digits = 1)
   ) %>%
   dplyr::ungroup()
 
 
 ##  Display table of site-level MNKA parameters
-DT::datatable(
-  data = siteMNKA %>% dplyr::rename(
-    "Mean Abundance (count/ha)" = siteMeanAbundance,
-    "Median Abundance (count/ha)" = siteMedAbundance,
-    "Average Min Abundance (count/ha)" = siteMinAbundance,
-    "Average Max Abundance (count/ha)" = siteMaxAbundance
-  ),
-  filter = "none",
-  rownames = FALSE,
-  options = list(pageLength = 10),
-  caption = "Small Mammal abundance metrics (count/ha) by siteID for selected sites for a 3-year
-  window centered on the year that CDW volume was measured."
+knitr::kable(
+  x = siteMNKA %>%
+    dplyr::ungroup() %>%
+    dplyr::rename(
+      "Mean Abundance (count/ha)" = siteMeanAbundance,
+      "Median Abundance (count/ha)" = siteMedAbundance,
+      "Average Min Abundance (count/ha)" = siteMinAbundance,
+      "Average Max Abundance (count/ha)" = siteMaxAbundance
+    ),
+  row.names = FALSE,
+  caption = "Small Mammal abundance metrics (count/ha) by siteID for selected sites
+  for a 3-year window centered on the year that CDW volume was measured."
 )
 
 ```
@@ -815,22 +835,16 @@ To create plot-level and site-level data sets suitable for plotting and correlat
 ``` {r unifyDataSets, message=FALSE}
 ### Join plot-level CDW and MAM datasets 
 plotDF <- plotCdwVol %>%
-  dplyr::left_join(
-    plotMNKA %>% 
-      dplyr::select(-plotBoutCount),
-    by = c("siteID", "plotID")
-  ) %>%
-  dplyr::filter(
-    !is.na(plotMaxAbundance)
-  )
+  dplyr::left_join(plotMNKA %>%
+                     dplyr::select(-plotBoutCount),
+                   by = c("siteID", "plotID")) %>%
+  dplyr::filter(!is.na(plotMaxAbundance))
 
 
 ### Join site-level CDW and MAM datasets
 siteDF <- siteCdwVol %>%
-  dplyr::left_join(
-    siteMNKA,
-    by = "siteID"
-  )
+  dplyr::left_join(siteMNKA,
+                   by = "siteID")
 
 ```
 
@@ -842,17 +856,11 @@ We first examine the potential relationship between CDW volume and Small Mammal 
 
 ``` {r generateGraph-allPlots, message=FALSE}
 ### Create graph of CDW volume vs. MAM maximum abundance across all plots and sites
-plotsGraph <- ggplot2::ggplot(
-  data = plotDF,
-  mapping = aes(
-    x = cdwVol,
-    y = plotMaxAbundance
-  )
-) +
-  ggplot2::geom_point(
-    alpha = 0.5,
-    size = 3
-  ) +
+plotsGraph <- ggplot2::ggplot(data = plotDF,
+                              mapping = aes(x = cdwVol,
+                                            y = plotMaxAbundance)) +
+  ggplot2::geom_point(alpha = 0.5,
+                      size = 3) +
   ggplot2::geom_smooth() +
   ggplot2::labs(
     x = "CDW Volume (m3/ha)",
@@ -872,23 +880,15 @@ Next, we check for correlations between CDW volume and Small Mammal abundance wi
 
 ``` {r generateGraph-allPlotsBySite, message=FALSE}
 ### Create graph of CDW volume vs. MAM maximum abundance across plots within site
-sitePlotsGraph <- ggplot2::ggplot(
-  data = plotDF,
-  mapping = aes(
-    x = cdwVol,
-    y = plotMaxAbundance
-  )
-) +
-  ggplot2::geom_point(
-    alpha = 0.5,
-    size = 3
-  ) +
+sitePlotsGraph <- ggplot2::ggplot(data = plotDF,
+                                  mapping = aes(x = cdwVol,
+                                                y = plotMaxAbundance)) +
+  ggplot2::geom_point(alpha = 0.5,
+                      size = 3) +
   ggplot2::geom_smooth(method = lm) +
-  ggplot2::facet_wrap(
-    facets = ~siteID,
-    ncol = 3,
-    scales = "free"
-  ) + 
+  ggplot2::facet_wrap(facets = ~ siteID,
+                      ncol = 3,
+                      scales = "free") +
   ggplot2::labs(
     x = "CDW Volume (m3/ha)",
     y = "Max Small Mammal Abundance (count/ha)",
@@ -906,30 +906,23 @@ Finally, we check for correlations between mean CDW volume and average maximum S
 
 ``` {r generateGraph-allSites, message=FALSE}
 ### Create graph of CDW volume vs. MAM maximum abundance across sites
-sitesGraph <- ggplot2::ggplot(
-  data = siteDF,
-  mapping = aes(
-    x = meanCdwVol,
-    y = siteMaxAbundance,
-  )
-) +
-  ggplot2::geom_point(
-    alpha = 0.5,
-    size = 3
-  ) +
+sitesGraph <- ggplot2::ggplot(data = siteDF,
+                              mapping = aes(x = meanCdwVol,
+                                            y = siteMaxAbundance,)) +
+  ggplot2::geom_point(alpha = 0.5,
+                      size = 3) +
   ggplot2::geom_smooth(method = lm) +
-  ggplot2::labs(
-    x = "CDW Volume (m3/ha)",
-    y = "Average Max Small Mammal Abundance (count/ha)",
-    title = "Figure 3. Correlation between CDW Volume and average max Small Mammal
-    Abundance across sites."
-  )
+  ggplot2::labs(x = "CDW Volume (m3/ha)",
+                y = "Average Max Small Mammal Abundance (count/ha)",
+                title = "Figure 3. Correlation between CDW Volume and average max Small Mammal
+    Abundance across sites.")
 
 sitesGraph
 
 ```
 
 - Across a selection of closed-canopy forested NEON sites, CDW volume (m^3^/ha) and Small Mammal abundance (count/ha) show a weak, negative correlation at the site scale (r~Pearson~ = `r round(cor(siteDF$meanCdwVol, siteDF$siteMaxAbundance), digits = 2)`).
+
 
 
 
@@ -940,6 +933,8 @@ sitesGraph
     - Note that more `plotID` values may be identified as colocated via the `geoNEON` function than via the table joining method due to the fact that `getLocByName()` identifieds all `plotIDs` that have ever been used for a given protocol, and not just those locations that are currently in use.
 - Plot-scale spatial collocation of TOS data products allows data users to investigate patterns within NEON sites.
 - All NEON TOS data products are colocated at the site-scale. Site-level estimates may be useful for investigating patterns at very large spatial scales.
+- Numerous methods for integrating data collected with different temporal frequencies are possible. Researchers should carefully evaluate methods suitable to the question of interest.
+
 
 
 
@@ -953,18 +948,35 @@ Slade, N.A. and Blair, S.M. (2000) An empirical test of using counts of individu
 
 
 
+
 ## Reproducibility
 
-Code was developed and tested using `R v4.1.2`, and key packages with versions as shown below. Worked example code may generate errors if key package versions are earlier than those indicated. Source code is available via GitHub: https://github.com/NEONScience/mee-tos-2022
+Code was developed and tested using `R v4.2.0`, and key packages with versions as shown below. Worked example code may generate errors if key package versions differ from those indicated. Source code is available via GitHub: https://github.com/NEONScience/ecosphere-tos-2022
 
 ``` {r reproducibility, echo=FALSE, message=FALSE}
 ### Package data frame comes from local system used to develop code
+# packages <- installed.packages() %>%
+#   as.data.frame() %>%
+#   dplyr::select(Package, Version, Depends, Built) %>%
+#   dplyr::filter(
+#     Package %in% c(
+#       "data.table",
+#       "devtools",
+#       "geoNEON",
+#       "knitr",
+#       "neonOS",
+#       "neonUtilities",
+#       "tidyverse"
+#     )
+#   )
+# 
+# saveRDS(packages, file = "packageInfo.RDS")
+
 packages <- readRDS(file = "packageInfo.RDS")
 
-DT::datatable(
-  data = packages,
-  filter = "none",
-  rownames = FALSE,
+knitr::kable(
+  x = packages,
+  row.names = FALSE,
   caption = "Key package versions used to develop and test worked example code."
 )
 

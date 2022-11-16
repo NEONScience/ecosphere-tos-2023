@@ -977,7 +977,7 @@ packages <- readRDS(file = "packageInfo.RDS")
 knitr::kable(
   x = packages,
   row.names = FALSE,
-  caption = "Key package versions used to develop and test worked example code."
+  caption = "Key package versions used to develop and test example code."
 )
 
 ```

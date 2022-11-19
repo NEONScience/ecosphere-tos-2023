@@ -906,7 +906,7 @@ knitr::kable(
 
 ### Create unified CDW and MAM datasets
 
-To create plot-level and site-level data sets suitable for plotting and correlation analyses, we join the CDW volume and Small Mammal abundance data at both plot and site scales.
+To create plot-level and site-level data sets suitable for plotting and correlation analyses, in the code chunk below we join the CDW volume and MAM abundance data at both plot and site scales.
 
 ``` {r unifyDataSets, message=FALSE}
 ### Join plot-level CDW and MAM datasets 
@@ -928,7 +928,7 @@ siteDF <- siteCdwVol %>%
 
 ### Create graphs of CDW and MAM data at plot and site spatial scales
 
-We first examine the potential relationship between CDW volume and Small Mammal abundance using data from all spatially colocated plots from all of the six forested sites we selected (HARV, JERC, STEI, UKFS, RMNP, and ABBY).
+We first examine the potential relationship between CDW volume and MAM abundance using data from all spatially colocated plots from all of the six forested sites we selected (HARV, JERC, STEI, UKFS, RMNP, and ABBY).
 
 ``` {r generateGraph-allPlots, message=FALSE}
 ### Create graph of CDW volume vs. MAM maximum abundance across all plots and sites
@@ -940,19 +940,21 @@ plotsGraph <- ggplot2::ggplot(data = plotDF,
   ggplot2::geom_smooth() +
   ggplot2::labs(
     x = "CDW Volume (m3/ha)",
-    y = "Max Small Mammal Abundance (count/ha)",
-    title = "Figure 1. Correlation between CDW Volume and Max Small Mammal
-    Abundance at the plot scale across forested sites."
+    y = "Max MAM Abundance (count/ha)",
+    title = "Figure 1. Correlation between CDW Volume and Max MAM
+    Abundance at the plot scale across six forested NEON sites."
   )
 
 plotsGraph
 
 ```
 
-- Across a selection of close-canopy forested NEON sites, measurements of CDW volume (m^3^/ha) and Small Mammal abundance (count/ha) reveal no clear correlation at the colocated plot-scale.
+Plot-level results across all sites:
+
+- Across a selection of close-canopy forested NEON sites, measurements of CDW volume (m^3^/ha) and MAM abundance (count/ha) reveal no clear correlation at the colocated plot-scale.
 - The Pearson's correlation coefficient is: `r round(cor(plotDF$cdwVol, plotDF$plotMaxAbundance), digits = 2)`.
 
-Next, we check for correlations between CDW volume and Small Mammal abundance within sites using colocated plot-scale data.
+In the next code chunk below, we check for correlations between CDW volume and Small Mammal abundance within sites using colocated plot-scale data.
 
 ``` {r generateGraph-allPlotsBySite, message=FALSE}
 ### Create graph of CDW volume vs. MAM maximum abundance across plots within site
@@ -967,8 +969,8 @@ sitePlotsGraph <- ggplot2::ggplot(data = plotDF,
                       scales = "free") +
   ggplot2::labs(
     x = "CDW Volume (m3/ha)",
-    y = "Max Small Mammal Abundance (count/ha)",
-    title = "Figure 2. Correlation between CDW Volume and Max Small Mammal
+    y = "Max MAM Abundance (count/ha)",
+    title = "Figure 2. Correlation between CDW Volume and Max MAM
     Abundance by plot within site."
   )
 
@@ -976,9 +978,14 @@ sitePlotsGraph
 
 ```
 
-- Within a selection of close-canopy forested NEON sites, CDW volume (m^3^/ha) and Small Mammal abundance (count/ha) show positive (RMNP, r~Pearson~ = `r round(cor(plotDF$cdwVol[plotDF$siteID=="RMNP"], plotDF$plotMaxAbundance[plotDF$siteID=="RMNP"]), digits = 2)`), negative (ABBY, r~Pearson~ = `r round(cor(plotDF$cdwVol[plotDF$siteID=="ABBY"], plotDF$plotMaxAbundance[plotDF$siteID=="ABBY"]), digits = 2)`), and weak correlations (HARV, JERC, STEI, UKFS).
+Plot-level results within site:
 
-Finally, we check for correlations between mean CDW volume and average maximum Small Mammal abundance at the site scale. 
+- Within a selection of close-canopy forested NEON sites, CDW volume (m^3^/ha) and MAM abundance (count/ha) show positive, negative, and weak correlations.
+- Positive correlation: RMNP, r~Pearson~ = `r round(cor(plotDF$cdwVol[plotDF$siteID=="RMNP"],  plotDF$plotMaxAbundance[plotDF$siteID=="RMNP"]), digits = 2)`). 
+- Negative correlation: ABBY, r~Pearson~ = `r round(cor(plotDF$cdwVol[plotDF$siteID=="ABBY"], plotDF$plotMaxAbundance[plotDF$siteID=="ABBY"]), digits = 2)`).
+- Weak correlations (HARV, JERC, STEI, UKFS).
+
+In the final code chunk below, we check for correlations between mean CDW volume and average maximum MAM abundance at the site scale.
 
 ``` {r generateGraph-allSites, message=FALSE}
 ### Create graph of CDW volume vs. MAM maximum abundance across sites
@@ -991,13 +998,15 @@ sitesGraph <- ggplot2::ggplot(data = siteDF,
   ggplot2::labs(x = "CDW Volume (m3/ha)",
                 y = "Average Max Small Mammal Abundance (count/ha)",
                 title = "Figure 3. Correlation between CDW Volume and average max Small Mammal
-    Abundance across sites.")
+    Abundance across a selection of forested NEON sites.")
 
 sitesGraph
 
 ```
 
-- Across a selection of closed-canopy forested NEON sites, CDW volume (m^3^/ha) and Small Mammal abundance (count/ha) show a weak, negative correlation at the site scale (r~Pearson~ = `r round(cor(siteDF$meanCdwVol, siteDF$siteMaxAbundance), digits = 2)`).
+Site-level results:
+
+- CDW volume (m^3^/ha) and MAM abundance (count/ha) show a weak, negative correlation at the site scale, r~Pearson~ = `r round(cor(siteDF$meanCdwVol, siteDF$siteMaxAbundance), digits = 2)`.
 
 
 
@@ -1005,8 +1014,8 @@ sitesGraph
 ## Conclusions
 
 - Coarse Downed Wood volume (m^3^/ha) and Small Mammal abundance (count/ha) can each be calculated at the plot-level, and spatially colocated plots are identified by a shared `plotID`. 
-    - It is possible to identify shared `plotID` values programmatically using the `geoNEON::getLocByName()`function (lines 120-125), or by downloading the CDW and Small Mammal datasets and joining via the `plotID` (lines 743-751).
-    - Note that more `plotID` values may be identified as colocated via the `geoNEON` function than via the table joining method due to the fact that `getLocByName()` identifieds all `plotIDs` that have ever been used for a given protocol, and not just those locations that are currently in use.
+    - It is possible to identify shared `plotID` values programmatically using the `geoNEON::getLocByName()`function (lines 183-188), or by downloading the CDW and Small Mammal datasets and joining via the `plotID` (lines 912-917).
+    - Note that more `plotID` values may be identified as colocated via the `geoNEON` function than via the table joining method due to the fact that `geoNEON::getLocByName()` identifieds all `plotIDs` that have ever been used for a given protocol, and not just those locations that are currently in use.
 - Plot-scale spatial collocation of TOS data products allows data users to investigate patterns within NEON sites.
 - All NEON TOS data products are colocated at the site-scale. Site-level estimates may be useful for investigating patterns at very large spatial scales.
 - Numerous methods for integrating data collected with different temporal frequencies are possible. Researchers should carefully evaluate methods suitable to the question of interest.
@@ -1027,7 +1036,7 @@ Slade, N.A. and Blair, S.M. (2000) An empirical test of using counts of individu
 
 ## Reproducibility
 
-Code was developed and tested using `R v4.2.1`, and key packages with versions as shown below. Worked example code may generate errors if key package versions differ from those indicated. Source code is available via GitHub: https://github.com/NEONScience/ecosphere-tos-2022
+Code was developed and tested using `R v4.2.1`, and key packages with versions as shown below. The code in this example may generate errors if key package versions differ from those indicated. Source code is available via GitHub: https://github.com/NEONScience/ecosphere-tos-2022
 
 ``` {r reproducibility, echo=FALSE, message=FALSE}
 ### Package data frame comes from local system used to develop code

@@ -518,7 +518,7 @@ mam_trapNight_nodups <- mam_trapNight_nodups %>%
 
 ## Analysis of Spatially Integrated Data Products at Plot and Site Scales
 
-In this section, we generate Coarse Downed Wood volume estimates and MAM abundance estimates at both plot and site scales to demonstrate the spatial integration of NEON TOS data products. Because CDW volume is generated every 5-years and does not change rapidly, barring fires or other site management activities, we compare with MAM data collected the same year as the CDW data +/- 1 year. For example, for HARV CDW volume data collected in 2019, we compare to MAM data collected from 2018-2020. While we have selected a 3-year MAM window centered on the CDW sampling year, other researchers may select a different approach based on the questions being addressed.
+In this section, we generate Coarse Downed Wood volume estimates and MAM abundance estimates at both plot and site scales to demonstrate the spatial integration of NEON TOS data products. Because CDW volume is generated every 5-years and does not change rapidly, barring fires or other site management activities, we compare with MAM data collected the same year as the CDW data +/- 1 year. For example, for HARV CDW volume data collected in 2019, we compare to MAM abundance data from 2018-2020. While we have selected a 3-year MAM window centered on the CDW sampling year, other researchers may select a different approach based on the questions being addressed.
 
 
 ### Create Coarse Downed Wood Volume Datasets
@@ -527,15 +527,24 @@ Using the LIDS method (Affleck 2008, 2010), CDW volume is calculated at the plot
 
 `CDW volume density = F * n` (m^3^/hectare); 
 
-where `F` is the site-specific volume factor, and `n` is the number of qualifying logs tallied across all three transects originating from the centroid of the plot. Importantly, at the plot scale, CDW volume density is colocated with Small Mammal abundance data at a maximum of n=6 plots per site (for `theSites` included in this analysis).
+where `F` is the site-specific volume factor (an approximate inverse to plot size), and `n` is the number of qualifying logs tallied across all three transects originating from the centroid of the plot. Importantly, at the plot scale, CDW volume density is colocated with MAM abundance data at a maximum of n=6 plots per site (for `theSites` included in this analysis).
 
-At the site scale, mean CDW volume (m^3^/hectare) is simply the mean of the plot scale values; the mean site-scale parameter is robust because of the spatially-balanced, stratified-random nature of the TOS Spatial Design. When comparing CDW volume and Small Mammal abundance at the site scale, CDW data from all Distributed plots are used for the calculation.
+At the site scale, mean CDW volume (m^3^/hectare) is simply the mean of the plot scale values; the mean site-scale parameter is robust because of the spatially-balanced, stratified-random nature of the TOS Spatial Design. When comparing CDW volume and MAM abundance at the site scale, CDW data from all Distributed plots are used for the calculation.
+
+In the code chunk below, we carry out the following steps:
+
+- Remove records with `samplingImpractical` not equal to "OK" and keep records with `samplingImpractical` equals "NA". The latter is important because the `samplingImpractical` field was introduce in 2020 and older data are not populated with a value.
+- Use the `targetTaxaPresent` field to identify only those records associated with a tallied log. For transects within a plot that have no logs, field staff create records with `targetTaxaPresent == N`. 
+- Calculate CDW volume density for those plotIDs that have logs.
+- Because plotIDs that have no logs tallied for any of the the three transects contribute meaningful zeroes to the dataset, we separately identify these plots and manually add a CDW volume density of '0' to the dataset.
+- Use plot-level CDW volume density data to calculate mean site-level CDW volume density and standard deviations.
 
 ``` {r cdwVolumeEstimates, message=FALSE}
-### Calculate CDW volume for each plotID in the cleaned dataset
-#   First, focus on plots with targetTaxaPresent=="Y" --> i.e., at least one qualifying 
-#   log was tallied within the plot. To do this, temporarily remove records for transects
-#   with no logs, and remove records with samplingImpractical != "OK".
+### Calculate CDW volume for each plotID in the cleaned dataset. First, focus
+### on plots with targetTaxaPresent == "Y" --> i.e., at least one qualifying log was
+### tallied within the plot. To do this, remove records for transects with no logs,
+### and remove records with samplingImpractical != "OK", then count the number of 
+### logs per plot and calculate CDW volume. 
 plotCdwVol <- filterCDW %>%
   dplyr::filter(is.na(samplingImpractical) |
                   samplingImpractical == "OK") %>%
@@ -544,8 +553,9 @@ plotCdwVol <- filterCDW %>%
   dplyr::summarise(logCount = n()) %>%
   dplyr::mutate(cdwVol = volumeFactor * logCount)
 
-#   Second, identify plots where all three transects do not have logs and bind to log 
-#   count output from above
+
+### Second, identify plots where all three transects do not have logs and bind to
+### add these important zeroes back to the log count output from above
 noLogs <- filterCDW %>%
   dplyr::filter(targetTaxaPresent == "N") %>%
   dplyr::group_by(domainID, siteID, volumeFactor, eventID, plotID) %>%
@@ -559,7 +569,9 @@ plotCdwVol <- plotCdwVol %>%
   dplyr::bind_rows(noLogs) %>%
   dplyr::arrange(domainID, siteID, eventID, plotID)
 
-#   Finally, add back mammalGrid collocation data
+
+### Add back mammalGrid collocation data that was dropped during grouping and
+### summarizing operations immediately above
 temp <- tempCDW %>%
   dplyr::select(plotID, subtype) %>%
   dplyr::distinct()
@@ -568,7 +580,7 @@ plotCdwVol <- plotCdwVol %>%
   dplyr::left_join(temp, by = "plotID")
 
 
-##  Display table of plot-level CDW volume estimates
+### Display table of plot-level CDW volume estimates
 knitr::kable(
   x = plotCdwVol %>%
     dplyr::ungroup() %>%
@@ -586,9 +598,8 @@ knitr::kable(
 )
 
 
-
-### Calculate CDW Volume for each siteID in the cleaned dataset and display
-#   Calculate site-level mean CDW volume
+### Finally, use plot-level CDW volume density calculated immediately above to
+### calculate mean site-level CDW and standard deviations.
 siteCdwVol <- plotCdwVol %>%
   dplyr::group_by(domainID, siteID, eventID) %>%
   dplyr::summarise(
@@ -597,7 +608,8 @@ siteCdwVol <- plotCdwVol %>%
     nCdwVol = n()
   )
 
-#   Display table of site-level CDW volume estimates
+
+### Display table of site-level CDW volume estimates
 knitr::kable(
   x = siteCdwVol %>%
     dplyr::ungroup() %>%
@@ -610,21 +622,29 @@ knitr::kable(
   caption = "CDW volume density estimates by siteID for selected sites and eventIDs."
 )
 
-
 ```
 
 
 
 ### Create Small Mammal Density datasets
 
-Here, we employ the minimum number known alive (MNKA) approach to estimate total small mammal abundance - e.g., as defined in Slade & Blair (2000). This approach assumes that a marked individual is present at all sampling points between its first and last capture dates, even if it was not actually captured in those interim trapping sessions. To make the dataset meet this assumption, we first add those implicit records to the dataset to make them explicit.
+In this section, we employ the minimum number known alive (MNKA) approach to estimate total MAM abundance - e.g., as defined in Slade & Blair (2000). This approach assumes that a marked individual is present at all sampling points between its first and last capture dates, even if it was not actually captured in those interim trapping sessions. To make the dataset meet this assumption, we add those implicit records to the dataset to make them explicit.
 
 Note: At the time of writing it is necessary to create Small Mammal `eventIDs` for legacy data collected prior to 2021. For the Small Mammal product, `eventIDs` correspond to discrete sampling bouts that represent a group of consecutive nights of trapping scheduled around a particular new moon. For the NEON 'RELEASE-2023' data, the omission of `eventID` from legacy data will be fixed and the code below that creates `eventIDs` will be moot.
 
+In the code chunk below, we carry out the following steps:
+
+- Use `mam_plotNight` data to create an `eventID` to group records according to unique sampling events. We assign the same `eventID` to each record with an `endDate` no more than 10 days later than the previously created record.
+- Rectify the `trapStatus` field in the `mam_trapNight` table for records of captured animals that do not have the correct value.
+- Filter the `mam_trapNight` data to retain records with the desired `trapStatus`, and records that have `taxonIDs` in the list of target taxa downloaded with the NEON Data Portal API. The latter step removes taxa from the dataset for which the MAM trapping protocol was not designed (e.g., shrews, weasels, etc.).
+- Use `mam_trapNight` data and a `for()` loop to add in missing trap nights so that the data meet the assumptions described in Slade & Blair (2000) for calculating MNKA. The `for()` loop is commented out and the resulting dataset is read back in due to the inefficient computation.
+- Use the `nightuid` to join the prepared `mam_trapNight` dataset with `mam_plotNight` to bring in the previously calculated `eventID`. The `eventID` is required for downstream computational steps.
+
 ``` {r mamFinalizeDatasets, results='asis', message=FALSE}
 ### Create eventID grouping variable using mam_plotNight data and add to mam_trapNight 
-#   Assign the same eventID to each record with an endDate no more than 10 days later 
-#   than the previously created record.
+### Assign the same eventID to each record with an endDate no more than 10 days later 
+### than the previously created record. Below, we use the 'data.table::shift()' 
+### function to return the previous row value for the specified column (i.e., endDate)
 mam_plotNight_nodups <- mam_plotNight_nodups %>%
   dplyr::mutate(year = as.integer(format(collectDate, "%Y")),
                 .before = eventID) %>%
@@ -647,65 +667,64 @@ mam_plotNight_nodups <- mam_plotNight_nodups %>%
   ) %>%
   dplyr::ungroup() %>%
   dplyr::select(-priorEndDate, -diffDays, -boutIncrement, -boutNum)
-# Above, shift() defaults to type = "lag", which returns the previous row value for the
-# specified column
 
-#   Add nightuid and eventID from mam_plotNight_nodups to mam_trapNight_nodups
+
+### Add nightuid and eventID from mam_plotNight_nodups to mam_trapNight_nodups
 mam_trapNight_nodups <- mam_trapNight_nodups %>%
   dplyr::left_join(mam_plotNight_nodups %>%
                      dplyr::select(nightuid, eventID),
                    by = "nightuid")
 
 
-
-### Create and finalize Small Mammal capture dataset for selected sites
-
-##  First, subset trapping data to only the capture records, i.e., the records that 
-##  describe a captured small mammal, including only those taxa for which the trapping
-##  protocol is designed. Subsetting can be done with a simple filtering based on 
-##  'trapStatus' and 'taxonProtocolCategory'; however, we first check to ensure all 
-##  captures have the correct 'trapStatus' - i.e., check if tagIDs exist but trap 
-##  status does not include "capture".
-
+### Create and finalize Small Mammal capture dataset for selected sites. First, 
+### check to ensure all captures have the correct 'trapStatus' - i.e., check if tagIDs
+### exist but trap status does not include "capture".
 problemRecords <- mam_trapNight_nodups %>%
   dplyr::filter(!is.na(tagID),
                 !grepl("capture", trapStatus))
 
-#   If nrow(problemRecords) > 0, update the corresponding trapStatus fields to 
-#   "5 - capture" or, in the rare case where there are multiple captures in one trap, 
-#   "4 - more than 1 capture in one trap" - this rare case does not occur in the current
-#   dataset, so it is not addressed here.
+
+### If nrow(problemRecords) > 0, update the corresponding trapStatus fields to 
+### "5 - capture" or, in the rare case where there are multiple captures in one trap, 
+### "4 - more than 1 capture in one trap" - this rare case does not occur in the 
+### current dataset, so it is not addressed here.
 mam_trapNight_nodups <- mam_trapNight_nodups %>%
-  dplyr::mutate(trapStatus = case_when(uid %in% problemRecords$uid ~ "5 - capture",
-                                       TRUE ~ trapStatus))
+  dplyr::mutate(trapStatus = case_when(
+    uid %in% problemRecords$uid ~ "5 - capture",
+    TRUE ~ trapStatus
+  ))
 
 
-##  Second, create list of target taxa from taxon list
+### Next, create the list of target taxa from taxon list downloaded from the API in
+### a previous code chunk.
 targetTaxa <- mam.list$data %>%
   dplyr::filter(taxonProtocolCategory == "target") %>%
   dplyr::select(taxonID)
 
 
-##  Third, simplify dataset to targetTaxa and core fields needed for analysis
+### Next, subset the trapping data to only the capture records, i.e., the records that 
+### describe a captured small mammal, including only those taxa for which the trapping
+### protocol is designed. Retain only those columns needed for the MNKA calculation.
 captures <- mam_trapNight_nodups %>%
   dplyr::filter(grepl("capture", trapStatus) &
                   taxonID %in% targetTaxa$taxonID) %>%
   dplyr::select(uid, nightuid, plotID, collectDate, tagID)
 
 
-##  Fourth, use the 'Minimum Number Known Alive' (MNKA) approach (Slade & Blair, 2000).
-#   Generate a column of all of the unique tagIDs included in the dataset
+### Next, per Slade & Blair (2000), generate a column of all the unique tagIDs
+### included in the dataset, and create an empty data frame to populate with 'for()'
+### loop output.
 uTags <- captures %>%
   dplyr::select(tagID) %>%
   dplyr::filter(!is.na(tagID)) %>%
   dplyr::distinct()
 
-#   Create empty data frame to populate with 'for()' loop output
 capsNew <- dplyr::slice(captures, 0)
 
-#   For each tagged individual, add a record for each night of trapping done in the plots
-#   in which it was captured between the first and last dates of capture.
 
+### Use the 'captures' data derived from mam_trapNight, and for each tagged 
+### individual, add a record for each night of trapping done in the plots
+### in which it was captured between the first and last dates of capture.
 # for (i in uTags$tagID) {
 #   temp <- captures %>% filter(tagID == i)
 #   firstCap <- as.Date(min(temp$collectDate), "YYYY-MM-DD", tz = "UTC")
@@ -720,20 +739,23 @@ capsNew <- dplyr::slice(captures, 0)
 #   temp2 <- dplyr::left_join(potentialNights, temp)
 #   capsNew <- dplyr::bind_rows(capsNew, temp2)
 # }
-# 
-# #   To avoid time-consuming processing, save a copy
+
+### Save a copy to avoid time-consuming 'for()' loop processing
 # saveRDS(capsNew, file = "mam_final_dataset.RDS")
 
-#   Read in processed capsNew dataset
+
+### Read in processed capsNew dataset
 capsNew <- readRDS(file = "mam_final_dataset.RDS")
 
-#   Add untagged individuals back to the dataset
+
+### Add untagged individuals back to the dataset
 capsNew <- captures %>%
   dplyr::filter(is.na(tagID)) %>%
   dplyr::bind_rows(capsNew)
 
-#   Add eventID to enable summarizing by trapping bouts (includes up to 3 nights of 
-#   trapping for some plots in each bout, 1 night for other plots).
+
+### Add eventID to enable summarizing by trapping bouts (includes up to 3 nights
+### of trapping for some plots in each bout, 1 night for other plots).
 capsNew <- capsNew %>%
   dplyr::left_join(mam_plotNight_nodups %>%
                      dplyr::select(eventID, nightuid),
@@ -743,7 +765,10 @@ capsNew <- capsNew %>%
 
 ```
 
-Next, we define a function to calculate MNKA for each plot within each bout. The function requires the `capsNew` data set generated above as an input, as well as a list of plots of interest (`plotsOI`), in the event that the `capsNew` data contain records from more plots than are needed for the MNKA estimation.
+In the code chunk below, we define a function to calculate MNKA for each plot within each bout:
+
+- The function requires the `capsNew` data set generated in the code chunk above as an input. 
+- In addition, in the event that the `capsNew` data contain records from more plots than are needed for the MNKA estimation, the function requires a list of plots of interest (`plotsOI`) to filter the input dataset to only those plots for which MNKA outputs are desired.
 
 ``` {r mamDensityFunctions, results='asis', message=FALSE}
 ### Define function to calculate MNKA for each plot within bout; 'plotsOI' is a required
@@ -770,20 +795,29 @@ mnka_per_plot_per_bout <- function(capture_data, plotsOI) {
   
   return(mnka_by_plot_bout)
 }
-# Output is MNKA (count/hectare), based on 1 ha size of trapping grid
+
+#--> Output is MNKA (count/hectare), based on the 1 ha size of the NEON trapping grid
 
 ```
 
-We now use the MNKA small mammal density function to calculate MNKA at the plot scale and site scale in order to compare to CDW volume density data calculated above. Because CDW volume does not change rapidly, and small mammal abundance may change substantially both within and among years, here we generate the maximum small mammal abundance for a given plot for a three-year window centered on the year that logs were tallied for CDW. Researchers may choose any number of different methods to integrate TOS data products with different temporal sampling frequencies (below, we also calculate mean, median, and minimum per-plot MAM abundance), and additional methods beyond those shown here will all give a different statistical result. 
+In the code chunk below, we carry out additional MAM calculations:
+
+- We use the MNKA small mammal density function defined immediately above to calculate MNKA at the plot scale.
+- We identify MAM data within 3-year windows by site based on the year that CDW volume density was sampled at each site.
+- Within the 3-year window, we retain the maximum MAM abundance observed for each plot to compare to plot-level CDW volume density data.
+    - Because CDW volume does not change rapidly, and MAM abundance may change substantially both within and among years, we generate the maximum small mammal abundance for a given plot for a three-year window centered on the year that logs were tallied for CDW. 
+    - Researchers may choose any number of different methods to integrate TOS data products with different temporal sampling frequencies (below, we also calculate mean, median, and minimum per-plot MAM abundance).
+    - Additional methods beyond those shown here will all give a different statistical result.
+- Plot-level MNKA MAM density data are used to calculate mean site-level MAM MNKA abundances. We also calculate several other MAM MNKA-based abundance metrics to illustrate the many choices available when working with these data.
 
 ``` {r mamMnkaEstimates, message=FALSE}
-### Calculate MNKA per plot per bout for all data in processed capsNew dataset and select
-### 3-year window of data appropriate for each site in order to match up with CDW volume.
-
+### Calculate MNKA per plot per bout for all data in processed capsNew dataset
 plotBoutMNKA <- mnka_per_plot_per_bout(capture_data = capsNew,
                                        plotsOI = unique(capsNew$plotID))
 
-#   Create table of MAM data within 3-year windows by site based on year of CDW volume
+
+### Create table of MAM data within 3-year windows by site based on year of CDW volume
+### sampling.
 mamSiteYears <- plotCdwVol %>%
   dplyr::ungroup() %>%
   dplyr::distinct(domainID, siteID, eventID) %>%
@@ -793,10 +827,11 @@ mamSiteYears <- plotCdwVol %>%
     maxMamYear = cdwYear + 1
   )
 
-#   Calculate plot-specific MNKA across bouts: Join plotBoutMNKA and mamSiteYears, 
-#   filter to records within 3-year window centered on CDW measurement year, and 
-#   determine maximum small mammal abundance for each plot, as well as other per plot
-#   metrics.
+
+### Calculate plot-specific MNKA across bouts: Join plotBoutMNKA and mamSiteYears, 
+### filter to records within 3-year window centered on CDW measurement year, and 
+### determine maximum small mammal abundance for each plot across all sampling
+### events, as well as other per plot metrics.
 plotMNKA <- plotBoutMNKA %>%
   dplyr::left_join(mamSiteYears %>%
                      dplyr::select(siteID,
@@ -816,7 +851,7 @@ plotMNKA <- plotBoutMNKA %>%
   dplyr::ungroup()
 
 
-##  Display table of plot-level MNKA parameters
+### Display table of plot-level MNKA parameters
 knitr::kable(
   x = plotMNKA %>%
     dplyr::ungroup() %>%
@@ -834,13 +869,11 @@ knitr::kable(
 )
 
 
-
-### Calculate MNKA metrics per site based on plot-level data
-#   siteMeanAbundance = mean abundance across plots within a site
-#   siteMedAbundance = median abundance across plots within a site
-#   siteMinAbundance = average minimum abundance across plots within a site
-#   siteMaxAbundance = average maximum abundance across plots within a site
-
+### Calculate MNKA metrics per site based on plot-level data:
+### siteMeanAbundance = mean abundance across plots within a site
+### siteMedAbundance = median abundance across plots within a site
+### siteMinAbundance = average minimum abundance across plots within a site
+### siteMaxAbundance = average maximum abundance across plots within a site
 siteMNKA <- plotMNKA %>%
   dplyr::group_by(siteID) %>%
   dplyr::summarise(
@@ -852,7 +885,7 @@ siteMNKA <- plotMNKA %>%
   dplyr::ungroup()
 
 
-##  Display table of site-level MNKA parameters
+### Display table of site-level MNKA parameters
 knitr::kable(
   x = siteMNKA %>%
     dplyr::ungroup() %>%

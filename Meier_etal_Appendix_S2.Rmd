@@ -1,6 +1,6 @@
 ---
 title: "Ecosphere - Spatial and temporal sampling strategy connecting NEON Terrestrial Observation System protocols"
-subtitle: "Supporting Information File 2: Example linking NEON TOS Coarse Downed Wood volume and Small Mammal abundance data at plot and site scales"
+subtitle: "Appendix S2: Example linking NEON TOS Coarse Downed Wood volume and Small Mammal abundance data at plot and site scales"
 author: "Courtney L. Meier, Katherine M. Thibault, and David T. Barnett"
 date: "`r format(Sys.Date(), format = '%B %d, %Y')`"
 output: 
@@ -541,6 +541,7 @@ In the code chunk below, we carry out the following steps:
 - Use plot-level CDW volume density data to calculate mean site-level CDW volume density and standard deviations.
 
 ``` {r cdwVolumeEstimates, message=FALSE}
+
 ### Calculate CDW volume for each plotID in the cleaned dataset. First, focus
 ### on plots with targetTaxaPresent == "Y" --> i.e., at least one qualifying log was
 ### tallied within the plot. To do this, remove records for transects with no logs,
@@ -942,7 +943,7 @@ plotsGraph <- ggplot2::ggplot(data = plotDF,
   ggplot2::labs(
     x = "CDW Volume (m3/ha)",
     y = "Max MAM Abundance (count/ha)",
-    title = "Figure 1. Correlation between CDW Volume and Max MAM
+    title = "Fig S1. Correlation between CDW Volume and Max MAM
     Abundance at the plot scale across six forested NEON sites."
   )
 
@@ -971,7 +972,7 @@ sitePlotsGraph <- ggplot2::ggplot(data = plotDF,
   ggplot2::labs(
     x = "CDW Volume (m3/ha)",
     y = "Max MAM Abundance (count/ha)",
-    title = "Figure 2. Correlation between CDW Volume and Max MAM
+    title = "Fig S2. Correlation between CDW Volume and Max MAM
     Abundance by plot within site."
   )
 
@@ -998,7 +999,7 @@ sitesGraph <- ggplot2::ggplot(data = siteDF,
   ggplot2::geom_smooth(method = lm) +
   ggplot2::labs(x = "CDW Volume (m3/ha)",
                 y = "Average Max Small Mammal Abundance (count/ha)",
-                title = "Figure 3. Correlation between CDW Volume and average max Small Mammal
+                title = "Fig S3. Correlation between CDW Volume and average max Small Mammal
     Abundance across a selection of forested NEON sites.")
 
 sitesGraph

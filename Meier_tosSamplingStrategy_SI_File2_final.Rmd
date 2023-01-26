@@ -1,5 +1,6 @@
 ---
-title: "Meier et al. (2022) Ecosphere - Supporting Information File 2: Example linking NEON TOS Coarse Downed Wood volume and Small Mammal abundance data at plot and site scales"
+title: "Ecosphere - Spatial and temporal sampling strategy connecting NEON Terrestrial Observation System protocols"
+subtitle: "Supporting Information File 2: Example linking NEON TOS Coarse Downed Wood volume and Small Mammal abundance data at plot and site scales"
 author: "Courtney L. Meier, Katherine M. Thibault, and David T. Barnett"
 date: "`r format(Sys.Date(), format = '%B %d, %Y')`"
 output: 
